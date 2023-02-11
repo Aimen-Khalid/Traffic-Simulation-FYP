@@ -113,23 +113,6 @@ def show_dcel(my_dcel):
         for vertex in vertices:
             plt.scatter(vertex[0], vertex[1])
     plt.show()
-    # pygame.display.flip()
-    # i = 0
-    # while run:
-    #     clock.tick(60)
-    #     p = vehicle.get_xy_lists()
-    #     vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
-    #     vehicle.error_point = car.Point(vehicle.error_point[0], vehicle.error_point[1])
-    #     draw_rectangle(p)
-    #     pygame.draw.circle(screen, (15, 15, 15), (vehicle.error_point.x, vehicle.error_point.y), 2)
-    #     if i % 20 == 0 and i > 50:
-    #         draw_car_perpendicular_line(vehicle)
-    #     vehicle.update_state_vars()
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             run = False
-    #     pygame.display.flip()
-    #     i += 1
 
 
 # def triangulate_face(face):
@@ -413,12 +396,9 @@ def build_dcel_from_file():
     return my_dcel
 
 
-main()
-# my_dcel = build_dcel_from_file()
-#
-# face = my_dcel.faces[0]
-# print(get_error(vehicle, face))
-# show_dcel(my_dcel)
+# main()
+my_dcel = build_dcel_from_file()
+show_dcel(my_dcel)
 
 # vertices, segments = get_vertices_and_segments()
 #
