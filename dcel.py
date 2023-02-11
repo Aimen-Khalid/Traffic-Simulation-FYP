@@ -204,11 +204,11 @@ class Dcel:
         self.__add_face_pointers()
         self.__create_outer_face(points)
 
-    def show_dcel(self, query=None):
-        if query is not None:
-            vs.plot_graph(self, query)
-        else:
-            vs.plot_graph(self)
+    # def show_dcel(self, query=None):
+    #     if query is not None:
+    #         vs.plot_graph(self, query)
+    #     else:
+    #         vs.plot_graph(self)
 
     def get_vertices(self):
         return list(self.vertices_map.values())

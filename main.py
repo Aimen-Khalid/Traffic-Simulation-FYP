@@ -4,6 +4,7 @@ import math
 import dcel
 import random
 import car
+import delaunay
 
 pygame.init()
 screen_width = 1500
@@ -124,7 +125,7 @@ def show_dcel(my_dcel):
 
 def triangulate_face(face):
     vertices = get_face_vertices(face)
-    triangles = Delaunay(vertices)
+    triangles = delaunay(vertices)
     triangles_vertices_indices = list(triangles.simplices)
     segments = []
     for triangle in triangles_vertices_indices:
