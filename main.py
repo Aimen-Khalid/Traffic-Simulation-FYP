@@ -164,16 +164,6 @@ def get_car_perpendicular_line(vehicle):
     return [(x1, y1), (x2, y2)]
 
 
-def draw_car_perpendicular_line(vehicle):
-    segment = get_car_perpendicular_line(vehicle)
-    color = (211, 211, 211)  # light grey
-    x1 = 0
-    y1 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x1)
-    x2 = screen_width
-    y2 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x2)
-    pygame.draw.line(screen, color, (x1, y1), (x2, y2))
-
-
 def get_vertices_and_segments():
     prev_x = 0
     prev_y = 0
@@ -181,19 +171,18 @@ def get_vertices_and_segments():
     vertices = []
     segments = []
     first = True
-    run = True
-    # Snap the points to the nearest grid point
     grid_spacing = 5
-    while run:
+    while True:
+        # if keyboard.is_pressed('d'):
+        #     return vertices, segments
+
         point = fig.ginput(n=1, show_clicks=True, mouse_add=1)
+        if len(point) == 0:
+            continue
         x = round(point[0][0] / grid_spacing) * grid_spacing
         y = round(point[0][1] / grid_spacing) * grid_spacing
         if (x, y) not in vertices:
             vertices.append((x, y))
-        # Print the snapped coordinates of the mouse clicks
-        # print(list(zip(x, y)))
-
-        # Plot the snapped points on the figure
         if not first:
             plt.plot([x, prev_x], [y, prev_y], 'o-')
             segment = [(prev_x, prev_y), (x, y)]
@@ -201,14 +190,12 @@ def get_vertices_and_segments():
                 segments.append(segment)
         else:
             plt.plot(x, y, 'o-')
-        # Display the resulting plot
         plt.draw()
+        if first and prev_x == x and prev_y == y:
+            return vertices, segments
+        first = prev_x == x and prev_y == y
         prev_x = x
         prev_y = y
-        first = bool(keyboard.is_pressed('space'))
-        if keyboard.is_pressed('d'):
-            run = False
-    return vertices, segments
 
 
 def main():
@@ -321,9 +308,9 @@ def build_dcel_from_file():
     return my_dcel
 
 
-main()
-# my_dcel = build_dcel_from_file()
-# show_dcel(my_dcel)
+# main()
+my_dcel = build_dcel_from_file()
+show_dcel(my_dcel)
 # Vs = [vehicle]
 # simulate(my_dcel, Vs, frames=500, fn="simulation6.mp4")
 
