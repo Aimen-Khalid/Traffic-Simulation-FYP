@@ -1,16 +1,10 @@
-import pygame
 import math
 import dcel
 import car
 import matplotlib.pyplot as plt
 import keyboard
+from matplotlib.animation import FuncAnimation
 # import delaunay
-
-pygame.init()
-screen_width = 1500
-screen_height = 750
-screen = pygame.display.set_mode((screen_width, screen_height))
-clock = pygame.time.Clock()
 
 # Set the figure size and create the axis
 fig, ax = plt.subplots(figsize=(50, 50))
@@ -26,62 +20,6 @@ vehicle = car.Vehicle(length=100, width=50, speed_limit=0, acc_limit=0, centroid
                       angle=5, v=car.Point(0, 0), a=car.Point(0, 0))
 
 
-def draw_grid(width, rows, surface):
-    size_between = width // rows
-
-    for i in range(0, width, size_between):
-        x, y = i, i
-        color = (211, 211, 211)  # light grey
-        pygame.draw.line(surface, color, (x, 0), (x, width))
-        pygame.draw.line(surface, color, (0, y), (width, y))
-
-
-class Click:
-    def _init_(self):
-        self.x = None
-        self.y = None
-
-    def set_coordinates(self, size_between):
-        x, y = pygame.mouse.get_pos()
-
-        mouse_x = x
-        mouse_y = y
-
-        offset_x = x % size_between
-        offset_y = y % size_between
-
-        if offset_x > (size_between / 2):
-            if offset_y > (size_between / 2):  # bottom right corner
-                mouse_x += size_between - offset_x
-                mouse_y += size_between - offset_y
-
-            else:  # top right corner
-                mouse_x += size_between - offset_x
-                mouse_y -= offset_y
-
-        elif offset_y < (size_between / 2):  # top left corner
-            mouse_x -= offset_x
-            mouse_y -= offset_y
-
-        else:  # bottom right corner
-            mouse_x -= offset_x
-            mouse_y += size_between - offset_y
-
-        self.x, self.y = mouse_x, mouse_y
-
-
-def draw_vertex(x, y, radius=3):
-    color = (0, 0, 0)
-    pygame.draw.circle(screen, color, (x, y), radius)
-    font = pygame.font.Font(None, 25)
-    text = font.render(f" {str(x)}, {str(y)}", True, (0, 0, 255))
-    screen.blit(text, (x, y))
-
-
-def draw_edge(x1, y1, x2, y2):
-    pygame.draw.line(screen, (255, 0, 0), (x1, y1), (x2, y2))
-
-
 def get_face_vertices(face):
     hedge = face.outer_component
     face_vertices = [[hedge.origin.x, hedge.origin.y]]
@@ -94,16 +32,17 @@ def get_face_vertices(face):
 
 def draw_rectangle(p):
     x, y = p[0], p[1]
-    rectangle = [(x[0], y[0]), (x[1], y[1]), (x[2], y[2]), (x[3], y[3])]
-    pygame.draw.polygon(screen, (200, 100, 60), rectangle, 0)
+    plt.plot(x, y)
+
+
+def draw_vehicle(vehicle):
+    p = vehicle.get_xy_lists()
+    draw_rectangle(p)
 
 
 def show_dcel(my_dcel):
-    current_face = my_dcel.faces[0]
-    run = True
-
     p = vehicle.get_xy_lists()
-    # draw_rectangle(p)
+    draw_rectangle(p)
     # draw_car_perpendicular_line(vehicle)
     for face in my_dcel.faces:
         vertices = get_face_vertices(face)
@@ -112,40 +51,71 @@ def show_dcel(my_dcel):
         plt.fill(x, y, color=face.fill_color)
         for vertex in vertices:
             plt.scatter(vertex[0], vertex[1])
+    draw_vehicle(vehicle)
     plt.show()
 
 
-# def triangulate_face(face):
-#     vertices = get_face_vertices(face)
-#     triangles = delaunay(vertices)
-#     triangles_vertices_indices = list(triangles.simplices)
-#     segments = []
-#     for triangle in triangles_vertices_indices:
-#         v1, v2, v3 = triangle
-#         segments.extend(
-#             (
-#                 [vertices[v1], vertices[v2]],
-#                 [vertices[v2], vertices[v3]],
-#                 [vertices[v3], vertices[v1]],
-#             )
-#         )
-#     return segments
+def simulate(my_dcel, vehicles, frames, fn):
+    current_face = my_dcel.faces[0]
+    vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
+    x_list, y_list = [], []
+    for V in vehicles:
+        # get the x and y coordinates for the current vehicle
+        x, y = V.get_xy_lists()
+        # append the x and y coordinates to the lists
+        x_list.append(x)
+        y_list.append(y)
+
+    lines = []
+    texts = []
+    for j in range(len(vehicles)):
+        line, = ax.plot(x_list[j], y_list[j])
+        text = ax.text(vehicles[j].centroid.x, vehicles[j].centroid.y, vehicles[j].velocity.norm())
+        text.set_size(8)
+        lines.append(line)  # storing all 2d lines (rectangles) in a list
+        texts.append(text)
+
+    def init():
+        lines[0].set_data(x_list[0], y_list[0])
+        texts[0].set_text(f'{vehicles[0].velocity.norm()} km/h')
+        texts[0].set_position((vehicles[0].centroid.x, vehicles[0].centroid.y))
+        return lines + texts
+
+    def animate(i):
+        for count, V in enumerate(vehicles):
+            # update the state variables for each vehicle
+            V.update_state_vars()
+            # get the updated x and y coordinates for the current vehicle
+            x, y = V.get_xy_lists()
+            # update the x and y lists with the updated coordinates
+            x_list[count] = x
+            y_list[count] = y
+            # leaving a trail behind the vehicle
+            # if i%5==0:
+            #   axis.plot(x[3], y[3], marker=".",markersize=1,markerfacecolor="black")
+
+        # update all lines with the updated x and y lists
+        for j in range(len(vehicles)):
+            lines[j].set_data(x_list[j], y_list[j])
+            texts[j].set_text(f'{int(vehicles[j].velocity.norm())} km/h')
+            # texts[j].set_text(f'{Vs[j].centroid.x} {Vs[j].centroid.y}')
+            x, y = vehicles[j].centroid.x, vehicles[j].centroid.y
+            texts[j].set_position((x, y))
+        # update axis limit to keep the vehicles in view
+        vehicle_xs = [element for sublist in x_list for element in sublist]
+        vehicle_ys = [element for sublist in y_list for element in sublist]
+        ax.set_xlim(min(vehicle_xs) - 5, max(vehicle_xs) + 5)
+        ax.set_ylim(min(vehicle_ys) - 5, max(vehicle_ys) + 5)
+        return lines + texts
+
+    anim = FuncAnimation(fig, animate, init_func=init,
+                         frames=frames, blit=True)
+
+    anim.save(fn, writer='ffmpeg', fps=30)
 
 
 def get_vertices_list(vertices):
     return [(vertex.x, vertex.y) for vertex in vertices]
-
-
-# def triangulate_dcel(dcel_to_triangulate):
-#     segments = []
-#     for face in dcel_to_triangulate.faces:
-#         segments.extend(triangulate_face(face))
-#     vertices = get_vertices_list(dcel_to_triangulate.get_vertices())
-#
-#     my_dcel = dcel.Dcel()
-#     my_dcel.build_dcel(vertices, segments)
-#
-#     my_dcel.show_dcel()
 
 
 def write_vertices_to_file(vertices):
@@ -241,48 +211,6 @@ def get_vertices_and_segments():
             first = True
         if keyboard.is_pressed('d'):
             run = False
-    return vertices, segments
-
-
-def get_vertices_and_segments1():
-    click = Click()
-    run = True
-    vertices = []
-    segments = []
-    screen.fill((255, 255, 255))
-
-    num_of_cols = 100
-    draw_grid(screen.get_width(), num_of_cols, screen)
-    escape_pressed = False
-    while run:
-        clock.tick(60)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    escape_pressed = True
-                if event.key == pygame.K_RETURN:
-                    run = False
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                click.set_coordinates(screen.get_width() // num_of_cols)
-                # vertices.append((click.x, screen.get_height() - click.y))
-                vertices.append((click.x, click.y))
-                # draw_vertex(vertices[-1][0], (vertices[-1][1] - screen.get_height()) * -1)
-                draw_vertex(vertices[-1][0], vertices[-1][1])
-                if not escape_pressed and len(vertices) > 1:
-                    segment = [vertices[-1], vertices[-2]]
-                    # draw_edge(vertices[-1][0], (vertices[-1][1] - screen.get_height()) * -1, vertices[-2][0],
-                    #           (vertices[-2][1] - screen.get_height()) * -1)
-                    draw_edge(vertices[-1][0], vertices[-1][1], vertices[-2][0],
-                              vertices[-2][1])
-                    segments.append(segment)
-                if escape_pressed:
-                    escape_pressed = False
-
-        pygame.display.flip()
     return vertices, segments
 
 
@@ -399,8 +327,6 @@ def build_dcel_from_file():
 # main()
 my_dcel = build_dcel_from_file()
 show_dcel(my_dcel)
+Vs = [vehicle]
+# simulate(my_dcel, Vs, frames=500, fn="simulation6.mp4")
 
-# vertices, segments = get_vertices_and_segments()
-#
-# print(vertices)
-# print(segments)
