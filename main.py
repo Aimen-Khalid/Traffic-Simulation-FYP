@@ -1,9 +1,9 @@
 import pygame
-# import matplotlib.pyplot as plt
 import math
 import dcel
-import random
 import car
+import matplotlib.pyplot as plt
+import keyboard
 # import delaunay
 
 pygame.init()
@@ -11,6 +11,16 @@ screen_width = 1500
 screen_height = 750
 screen = pygame.display.set_mode((screen_width, screen_height))
 clock = pygame.time.Clock()
+
+# Set the figure size and create the axis
+fig, ax = plt.subplots(figsize=(50, 50))
+ax.set_aspect('equal')
+
+# Set the axis limits and add the grid lines
+ax.axis([0, 50, 0, 50])
+ax.xaxis.set_ticks(range(0, 50, 5))
+ax.yaxis.set_ticks(range(0, 50, 5))
+ax.grid(color='green', linestyle='-', linewidth=0.5)
 
 vehicle = car.Vehicle(length=100, width=50, speed_limit=0, acc_limit=0, centroid=car.Point(345, 85),
                       angle=5, v=car.Point(0, 0), a=car.Point(0, 0))
@@ -91,36 +101,35 @@ def draw_rectangle(p):
 def show_dcel(my_dcel):
     current_face = my_dcel.faces[0]
     run = True
-    screen.fill((255, 255, 255))
-
-    num_of_cols = 100
-    draw_grid(screen.get_width(), num_of_cols, screen)
 
     p = vehicle.get_xy_lists()
-    draw_rectangle(p)
-    draw_car_perpendicular_line(vehicle)
+    # draw_rectangle(p)
+    # draw_car_perpendicular_line(vehicle)
     for face in my_dcel.faces:
         vertices = get_face_vertices(face)
-        pygame.draw.polygon(screen, face.fill_color, vertices, 0)
+        x = [x for x, y in vertices]
+        y = [y for x, y in vertices]
+        plt.fill(x, y, color=face.fill_color)
         for vertex in vertices:
-            draw_vertex(vertex[0], vertex[1])
-    pygame.display.flip()
-    i = 0
-    while run:
-        clock.tick(60)
-        p = vehicle.get_xy_lists()
-        vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
-        vehicle.error_point = car.Point(vehicle.error_point[0], vehicle.error_point[1])
-        draw_rectangle(p)
-        pygame.draw.circle(screen, (15, 15, 15), (vehicle.error_point.x, vehicle.error_point.y), 2)
-        if i % 20 == 0 and i > 50:
-            draw_car_perpendicular_line(vehicle)
-        vehicle.update_state_vars()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-        pygame.display.flip()
-        i += 1
+            plt.scatter(vertex[0], vertex[1])
+    plt.show()
+    # pygame.display.flip()
+    # i = 0
+    # while run:
+    #     clock.tick(60)
+    #     p = vehicle.get_xy_lists()
+    #     vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
+    #     vehicle.error_point = car.Point(vehicle.error_point[0], vehicle.error_point[1])
+    #     draw_rectangle(p)
+    #     pygame.draw.circle(screen, (15, 15, 15), (vehicle.error_point.x, vehicle.error_point.y), 2)
+    #     if i % 20 == 0 and i > 50:
+    #         draw_car_perpendicular_line(vehicle)
+    #     vehicle.update_state_vars()
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             run = False
+    #     pygame.display.flip()
+    #     i += 1
 
 
 # def triangulate_face(face):
@@ -213,6 +222,46 @@ def draw_car_perpendicular_line(vehicle):
 
 
 def get_vertices_and_segments():
+    # Get the coordinates of the mouse clicks
+    prev_x = 0
+    prev_y = 0
+
+    vertices = []
+    segments = []
+    first = True
+    run = True
+    # Snap the points to the nearest grid point
+    grid_spacing = 5
+    while run:
+        point = fig.ginput(n=1, show_clicks=True, mouse_add=1)
+        x = round(point[0][0] / grid_spacing) * grid_spacing
+        y = round(point[0][1] / grid_spacing) * grid_spacing
+        if (x, y) not in vertices:
+            vertices.append((x, y))
+        # Print the snapped coordinates of the mouse clicks
+        # print(list(zip(x, y)))
+
+        # Plot the snapped points on the figure
+        if not first:
+            plt.plot([x, prev_x], [y, prev_y], 'o-')
+            segment = [(prev_x, prev_y), (x, y)]
+            if not (prev_x == x and prev_y == y):
+                segments.append(segment)
+        else:
+            plt.plot(x, y, 'o-')
+        # Display the resulting plot
+        plt.draw()
+        prev_x = x
+        prev_y = y
+        first = False
+        if keyboard.is_pressed('space'):
+            first = True
+        if keyboard.is_pressed('d'):
+            run = False
+    return vertices, segments
+
+
+def get_vertices_and_segments1():
     click = Click()
     run = True
     vertices = []
@@ -259,7 +308,6 @@ def main():
     dcel_obj = dcel.Dcel()
     dcel_obj.build_dcel(vertices, segments)
     show_dcel(dcel_obj)
-    # myDCEL.show_dcel()
     write_vertices_to_file(vertices)
     write_segments_to_file(segments)
 
@@ -365,10 +413,14 @@ def build_dcel_from_file():
     return my_dcel
 
 
-# main()
-my_dcel = build_dcel_from_file()
+main()
+# my_dcel = build_dcel_from_file()
+#
+# face = my_dcel.faces[0]
+# print(get_error(vehicle, face))
+# show_dcel(my_dcel)
 
-face = my_dcel.faces[0]
-print(get_error(vehicle, face))
-show_dcel(my_dcel)
-
+# vertices, segments = get_vertices_and_segments()
+#
+# print(vertices)
+# print(segments)

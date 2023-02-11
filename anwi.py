@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import keyboard
+
 
 # Set the figure size and create the axis
 fig, ax = plt.subplots(figsize=(50, 50))
@@ -25,7 +27,7 @@ while True:
     y = [round(point[1] / grid_spacing) * grid_spacing for point in points]
 
     # Print the snapped coordinates of the mouse clicks
-    print(list(zip(x, y)))
+    # print(list(zip(x, y)))
 
     # Plot the snapped points on the figure
     if not first:
@@ -37,3 +39,6 @@ while True:
     prev_x = x
     prev_y = y
     first = False
+    if keyboard.is_pressed('space'):
+        first = True
+        print("escape pressed")

@@ -7,7 +7,7 @@ class Face:
     def __init__(self):
         self.name = None
         self.outer_component = None  # One half edge of the outer-cycle
-        self.fill_color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        self.fill_color = (random.random(), random.random(), random.random())
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
