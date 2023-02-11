@@ -164,14 +164,14 @@ def get_car_perpendicular_line(vehicle):
     return [(x1, y1), (x2, y2)]
 
 
-def draw_car_perpendicular_line(vehicle):
-    segment = get_car_perpendicular_line(vehicle)
-    color = (211, 211, 211)  # light grey
-    x1 = 0
-    y1 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x1)
-    x2 = screen_width
-    y2 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x2)
-    pygame.draw.line(screen, color, (x1, y1), (x2, y2))
+# def draw_car_perpendicular_line(vehicle):
+#     segment = get_car_perpendicular_line(vehicle)
+#     color = (211, 211, 211)  # light grey
+#     x1 = 0
+#     y1 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x1)
+#     x2 = screen_width
+#     y2 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x2)
+#     pygame.draw.line(screen, color, (x1, y1), (x2, y2))
 
 
 def get_vertices_and_segments():
