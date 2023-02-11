@@ -7,16 +7,16 @@ from matplotlib.animation import FuncAnimation
 # import delaunay
 
 # Set the figure size and create the axis
-fig, ax = plt.subplots(figsize=(50, 50))
+fig, ax = plt.subplots(figsize=(200, 100))
 ax.set_aspect('equal')
 
 # Set the axis limits and add the grid lines
 ax.axis([0, 50, 0, 50])
-ax.xaxis.set_ticks(range(0, 50, 5))
-ax.yaxis.set_ticks(range(0, 50, 5))
+ax.xaxis.set_ticks(range(0, 200, 5))
+ax.yaxis.set_ticks(range(0, 100, 5))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
-vehicle = car.Vehicle(length=100, width=50, speed_limit=0, acc_limit=0, centroid=car.Point(345, 85),
+vehicle = car.Vehicle(length=10, width=5, speed_limit=0, acc_limit=0, centroid=car.Point(25, 25),
                       angle=5, v=car.Point(0, 0), a=car.Point(0, 0))
 
 
@@ -175,7 +175,6 @@ def draw_car_perpendicular_line(vehicle):
 
 
 def get_vertices_and_segments():
-    # Get the coordinates of the mouse clicks
     prev_x = 0
     prev_y = 0
 
@@ -198,7 +197,7 @@ def get_vertices_and_segments():
         if not first:
             plt.plot([x, prev_x], [y, prev_y], 'o-')
             segment = [(prev_x, prev_y), (x, y)]
-            if not (prev_x == x and prev_y == y):
+            if prev_x != x or prev_y != y:
                 segments.append(segment)
         else:
             plt.plot(x, y, 'o-')
@@ -206,9 +205,7 @@ def get_vertices_and_segments():
         plt.draw()
         prev_x = x
         prev_y = y
-        first = False
-        if keyboard.is_pressed('space'):
-            first = True
+        first = bool(keyboard.is_pressed('space'))
         if keyboard.is_pressed('d'):
             run = False
     return vertices, segments
@@ -324,9 +321,9 @@ def build_dcel_from_file():
     return my_dcel
 
 
-# main()
-my_dcel = build_dcel_from_file()
-show_dcel(my_dcel)
-Vs = [vehicle]
+main()
+# my_dcel = build_dcel_from_file()
+# show_dcel(my_dcel)
+# Vs = [vehicle]
 # simulate(my_dcel, Vs, frames=500, fn="simulation6.mp4")
 
