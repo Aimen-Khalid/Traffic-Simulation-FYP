@@ -4,7 +4,7 @@ import math
 import dcel
 import random
 import car
-import delaunay
+# import delaunay
 
 pygame.init()
 screen_width = 1500
@@ -123,37 +123,37 @@ def show_dcel(my_dcel):
         i += 1
 
 
-def triangulate_face(face):
-    vertices = get_face_vertices(face)
-    triangles = delaunay(vertices)
-    triangles_vertices_indices = list(triangles.simplices)
-    segments = []
-    for triangle in triangles_vertices_indices:
-        v1, v2, v3 = triangle
-        segments.extend(
-            (
-                [vertices[v1], vertices[v2]],
-                [vertices[v2], vertices[v3]],
-                [vertices[v3], vertices[v1]],
-            )
-        )
-    return segments
+# def triangulate_face(face):
+#     vertices = get_face_vertices(face)
+#     triangles = delaunay(vertices)
+#     triangles_vertices_indices = list(triangles.simplices)
+#     segments = []
+#     for triangle in triangles_vertices_indices:
+#         v1, v2, v3 = triangle
+#         segments.extend(
+#             (
+#                 [vertices[v1], vertices[v2]],
+#                 [vertices[v2], vertices[v3]],
+#                 [vertices[v3], vertices[v1]],
+#             )
+#         )
+#     return segments
 
 
 def get_vertices_list(vertices):
     return [(vertex.x, vertex.y) for vertex in vertices]
 
 
-def triangulate_dcel(dcel_to_triangulate):
-    segments = []
-    for face in dcel_to_triangulate.faces:
-        segments.extend(triangulate_face(face))
-    vertices = get_vertices_list(dcel_to_triangulate.get_vertices())
-
-    my_dcel = dcel.Dcel()
-    my_dcel.build_dcel(vertices, segments)
-
-    my_dcel.show_dcel()
+# def triangulate_dcel(dcel_to_triangulate):
+#     segments = []
+#     for face in dcel_to_triangulate.faces:
+#         segments.extend(triangulate_face(face))
+#     vertices = get_vertices_list(dcel_to_triangulate.get_vertices())
+#
+#     my_dcel = dcel.Dcel()
+#     my_dcel.build_dcel(vertices, segments)
+#
+#     my_dcel.show_dcel()
 
 
 def write_vertices_to_file(vertices):
