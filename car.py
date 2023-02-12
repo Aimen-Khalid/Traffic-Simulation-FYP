@@ -1,6 +1,7 @@
 import math
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
+import numpy as np
 dt = 0.01
 
 
@@ -60,8 +61,24 @@ def get_avg_centroid(vehicles):
     return avg_centroid/len(vehicles)
 
 
+def point_above_line(point, line_start, line_end):
+    # Calculate the vector from the line start to the point
+    p1 = np.array(line_start)
+    p2 = np.array(point)
+    p3 = np.array(line_end)
+    v1 = p2 - p1
+
+    # Calculate the vector from the line start to the line end
+    v2 = p3 - p1
+
+    # Calculate the cross product
+    cross_product = np.cross(v1, v2)
+    # If the cross product is positive, the point is above the line
+    return cross_product > 0
+
+
 class Vehicle:
-    theta = 15
+    theta = 45
 
     def __init__(self, length, width, speed_limit, acc_limit, centroid, angle, v, a, error=Point(0, 0),
                  current_face=None):
@@ -122,15 +139,16 @@ class Vehicle:
 
     def controller(self):
         vehicle_x, vehicle_y = self.get_car_mid_point()
+        line_start = (vehicle_x, vehicle_y)
+        line_end = (self.velocity.x, self.velocity.y)
         if self.face_mid_point is None:
             return self.acc
-        if vehicle_x < self.face_mid_point[0]:
+        if point_above_line(self.face_mid_point, line_start, line_end):
             self.theta = -1 * abs(self.theta)
         else:
             self.theta = abs(self.theta)
-        self.acc = get_vector(-1 * (self.theta + (self.angle * 180 / math.pi)), self.error)
+        self.acc = get_vector(-1 * (self.theta + (self.angle * 180 / math.pi)), self.error * 15)
         return self.acc
-        # return Point(0, 0)
 
     def update_state_vars(self):
         self.velocity += (self.controller() * dt)
