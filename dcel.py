@@ -1,6 +1,7 @@
 import math as m
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 import random
+import matplotlib.pyplot as plt
 
 
 class Face:
@@ -8,6 +9,16 @@ class Face:
         self.name = None
         self.outer_component = None  # One half edge of the outer-cycle
         self.fill_color = (random.random(), random.random(), random.random())
+        self.polygon = None
+
+    def get_face_vertices(self):
+        hedge = self.outer_component
+        face_vertices = [[hedge.origin.x, hedge.origin.y]]
+        hedge = hedge.next
+        while hedge != self.outer_component:
+            face_vertices.append((hedge.origin.x, hedge.origin.y))
+            hedge = hedge.next
+        return face_vertices
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
@@ -125,12 +136,10 @@ class HedgesMap:
         return self.origin_destination_map[origin][destination]
 
     def get_outgoing_hedges(self, origin):
-        outgoing_hedges = list(self.origin_destination_map[origin].values())
-        return outgoing_hedges
+        return list(self.origin_destination_map[origin].values())
 
     def get_incoming_hedges(self, destination):
-        incoming_hedges = list(self.destination_origin_map[destination].values())
-        return incoming_hedges
+        return list(self.destination_origin_map[destination].values())
 
     # Returns outgoing half edges in clockwise order
     def get_outgoing_hedges_clockwise(self, origin):
@@ -146,8 +155,9 @@ class HedgesMap:
 
     # Returns all the incoming and outgoing half edges
     def get_all_hedges_of_vertex(self, vertex):
-        hedges = self.get_incoming_hedges_clockwise(vertex) + self.get_outgoing_hedges(vertex)
-        return hedges
+        return self.get_incoming_hedges_clockwise(
+            vertex
+        ) + self.get_outgoing_hedges(vertex)
 
     # Returns all hedges of the mapping
     def get_all_hedges(self):
@@ -203,12 +213,29 @@ class Dcel:
         self.__add_next_and_previous_pointers()
         self.__add_face_pointers()
         self.__create_outer_face(points)
+        for face in self.faces:
+            vertices = face.get_face_vertices()
+            face.polygon = Polygon(list(vertices))
+            # print(face.polygon)
+            # x, y = face.polygon.exterior.xy
+            # plt.plot(x, y)
+            # plt.show()
 
-    # def show_dcel(self, query=None):
-    #     if query is not None:
-    #         vs.plot_graph(self, query)
-    #     else:
-    #         vs.plot_graph(self)
+    def show_dcel(self):
+        for face in self.faces:
+            vertices = face.get_face_vertices()
+            x = [x for x, y in vertices]
+            y = [y for x, y in vertices]
+            plt.fill(x, y, color=face.fill_color)
+            for vertex in vertices:
+                plt.scatter(vertex[0], vertex[1])
+        plt.show()
+
+    def get_face_for_point(self, point):
+        point = Point(point[0], point[1])
+        for face in self.faces:
+            if point.within(face.polygon):
+                return face
 
     def get_vertices(self):
         return list(self.vertices_map.values())
