@@ -2,12 +2,11 @@ import math
 import dcel
 import car
 import matplotlib.pyplot as plt
-import keyboard
+import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation
-# import delaunay
 
 # Set the figure size and create the axis
-fig, ax = plt.subplots(figsize=(200, 100))
+fig, ax = plt.subplots(figsize=(100, 100))
 ax.set_aspect('equal')
 
 # Set the axis limits and add the grid lines
@@ -17,7 +16,7 @@ ax.yaxis.set_ticks(range(0, 100, 5))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
 vehicle = car.Vehicle(length=10, width=5, speed_limit=0, acc_limit=0, centroid=car.Point(25, 25),
-                      angle=5, v=car.Point(0, 0), a=car.Point(0, 0))
+                      angle=5, v=car.Point(5, 5), a=car.Point(0, 0))
 
 
 def get_face_vertices(face):
@@ -53,65 +52,6 @@ def show_dcel(my_dcel):
             plt.scatter(vertex[0], vertex[1])
     draw_vehicle(vehicle)
     plt.show()
-
-
-def simulate(my_dcel, vehicles, frames, fn):
-    current_face = my_dcel.faces[0]
-    vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
-    x_list, y_list = [], []
-    for V in vehicles:
-        # get the x and y coordinates for the current vehicle
-        x, y = V.get_xy_lists()
-        # append the x and y coordinates to the lists
-        x_list.append(x)
-        y_list.append(y)
-
-    lines = []
-    texts = []
-    for j in range(len(vehicles)):
-        line, = ax.plot(x_list[j], y_list[j])
-        text = ax.text(vehicles[j].centroid.x, vehicles[j].centroid.y, vehicles[j].velocity.norm())
-        text.set_size(8)
-        lines.append(line)  # storing all 2d lines (rectangles) in a list
-        texts.append(text)
-
-    def init():
-        lines[0].set_data(x_list[0], y_list[0])
-        texts[0].set_text(f'{vehicles[0].velocity.norm()} km/h')
-        texts[0].set_position((vehicles[0].centroid.x, vehicles[0].centroid.y))
-        return lines + texts
-
-    def animate(i):
-        for count, V in enumerate(vehicles):
-            # update the state variables for each vehicle
-            V.update_state_vars()
-            # get the updated x and y coordinates for the current vehicle
-            x, y = V.get_xy_lists()
-            # update the x and y lists with the updated coordinates
-            x_list[count] = x
-            y_list[count] = y
-            # leaving a trail behind the vehicle
-            # if i%5==0:
-            #   axis.plot(x[3], y[3], marker=".",markersize=1,markerfacecolor="black")
-
-        # update all lines with the updated x and y lists
-        for j in range(len(vehicles)):
-            lines[j].set_data(x_list[j], y_list[j])
-            texts[j].set_text(f'{int(vehicles[j].velocity.norm())} km/h')
-            # texts[j].set_text(f'{Vs[j].centroid.x} {Vs[j].centroid.y}')
-            x, y = vehicles[j].centroid.x, vehicles[j].centroid.y
-            texts[j].set_position((x, y))
-        # update axis limit to keep the vehicles in view
-        vehicle_xs = [element for sublist in x_list for element in sublist]
-        vehicle_ys = [element for sublist in y_list for element in sublist]
-        ax.set_xlim(min(vehicle_xs) - 5, max(vehicle_xs) + 5)
-        ax.set_ylim(min(vehicle_ys) - 5, max(vehicle_ys) + 5)
-        return lines + texts
-
-    anim = FuncAnimation(fig, animate, init_func=init,
-                         frames=frames, blit=True)
-
-    anim.save(fn, writer='ffmpeg', fps=30)
 
 
 def get_vertices_list(vertices):
@@ -308,9 +248,111 @@ def build_dcel_from_file():
     return my_dcel
 
 
+def update_state_vars(frame_num, vehicle, my_dcel):
+    vehicle.update_state_vars()
+    show_dcel(my_dcel)
+    draw_vehicle(vehicle)
+
+
+def create_animation(vehicle, my_dcel, num_frames):
+    anim = animation.FuncAnimation(fig, update_state_vars, fargs=(vehicle, my_dcel), frames=num_frames,
+                                   repeat=False)
+    plt.show()
+    anim.save('dcel_vehicle_animation.mp4')
+
+
+def simulate1(my_dcel, vehicles, frames, fn):
+    current_face = my_dcel.faces[0]
+    vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
+    x_list, y_list = [], []
+    # show_dcel(my_dcel)
+    for V in vehicles:
+        # get the x and y coordinates for the current vehicle
+        x, y = V.get_xy_lists()
+        # append the x and y coordinates to the lists
+        x_list.append(x)
+        y_list.append(y)
+
+    lines = []
+    texts = []
+    for j in range(len(vehicles)):
+        line, = ax.plot(x_list[j], y_list[j])
+        text = ax.text(vehicles[j].centroid.x, vehicles[j].centroid.y, vehicles[j].velocity.norm())
+        text.set_size(8)
+        lines.append(line)  # storing all 2d lines (rectangles) in a list
+        texts.append(text)
+
+    def init():
+        lines[0].set_data(x_list[0], y_list[0])
+        texts[0].set_text(f'{vehicles[0].velocity.norm()} km/h')
+        texts[0].set_position((vehicles[0].centroid.x, vehicles[0].centroid.y))
+        return lines + texts
+
+    def animate(i):
+        for count, V in enumerate(vehicles):
+            # update the state variables for each vehicle
+            V.update_state_vars()
+            # get the updated x and y coordinates for the current vehicle
+            x, y = V.get_xy_lists()
+            # update the x and y lists with the updated coordinates
+            x_list[count] = x
+            y_list[count] = y
+            # leaving a trail behind the vehicle
+            # if i%5==0:
+            #   axis.plot(x[3], y[3], marker=".",markersize=1,markerfacecolor="black")
+
+        # update all lines with the updated x and y lists
+        for j in range(len(vehicles)):
+            lines[j].set_data(x_list[j], y_list[j])
+            texts[j].set_text(f'{int(vehicles[j].velocity.norm())} km/h')
+            # texts[j].set_text(f'{Vs[j].centroid.x} {Vs[j].centroid.y}')
+            x, y = vehicles[j].centroid.x, vehicles[j].centroid.y
+            texts[j].set_position((x, y))
+        # update axis limit to keep the vehicles in view
+        vehicle_xs = [element for sublist in x_list for element in sublist]
+        vehicle_ys = [element for sublist in y_list for element in sublist]
+        ax.set_xlim(min(vehicle_xs) - 5, max(vehicle_xs) + 5)
+        ax.set_ylim(min(vehicle_ys) - 5, max(vehicle_ys) + 5)
+        return lines + texts
+
+    anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
+
+    anim.save(fn, writer='ffmpeg', fps=30)
+
+
+def simulate(my_dcel, vehicle, frames, fn):
+    fig = plt.figure()
+
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+    lines = []
+    for count, face in enumerate(my_dcel.faces):
+        vertices = get_face_vertices(face)
+        x = [x for x, y in vertices]
+        x.append(vertices[0][0])
+        y = [y for x, y in vertices]
+        y.append(vertices[0][1])
+        line, = ax.plot(x, y)
+        lines.append(line)
+
+    def init():
+        return lines
+
+    vehicle_line, = ax.plot([], [])
+
+    def animate(i):
+        vehicle.update_state_vars()
+        x, y = vehicle.get_xy_lists()
+        vehicle_line.set_data(x, y)
+        return vehicle_line,
+
+    anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
+
+    anim.save(fn, writer='ffmpeg', fps=30)
+
+
 # main()
 my_dcel = build_dcel_from_file()
-show_dcel(my_dcel)
-# Vs = [vehicle]
-# simulate(my_dcel, Vs, frames=500, fn="simulation6.mp4")
+# show_dcel(my_dcel)
+simulate(my_dcel, vehicle, frames=500, fn="simulation2.mp4")
 
