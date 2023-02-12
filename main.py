@@ -2,12 +2,11 @@ import math
 import dcel
 import car
 import matplotlib.pyplot as plt
-import keyboard
 from matplotlib.animation import FuncAnimation
-# import delaunay
+import numpy as np
 
 # Set the figure size and create the axis
-fig, ax = plt.subplots(figsize=(200, 100))
+fig, ax = plt.subplots(figsize=(100, 100))
 ax.set_aspect('equal')
 
 # Set the axis limits and add the grid lines
@@ -16,18 +15,8 @@ ax.xaxis.set_ticks(range(0, 200, 5))
 ax.yaxis.set_ticks(range(0, 100, 5))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
-vehicle = car.Vehicle(length=10, width=5, speed_limit=0, acc_limit=0, centroid=car.Point(25, 25),
-                      angle=5, v=car.Point(0, 0), a=car.Point(0, 0))
-
-
-def get_face_vertices(face):
-    hedge = face.outer_component
-    face_vertices = [[hedge.origin.x, hedge.origin.y]]
-    hedge = hedge.next
-    while hedge != face.outer_component:
-        face_vertices.append((hedge.origin.x, hedge.origin.y))
-        hedge = hedge.next
-    return face_vertices
+vehicle = car.Vehicle(length=10, width=5, speed_limit=0, acc_limit=0, centroid=car.Point(30, 25),
+                      angle=5, v=car.Point(5, -5), a=car.Point(0, 0))
 
 
 def draw_rectangle(p):
@@ -35,91 +24,12 @@ def draw_rectangle(p):
     plt.plot(x, y)
 
 
-def draw_vehicle(vehicle):
-    p = vehicle.get_xy_lists()
-    draw_rectangle(p)
-
-
-def show_dcel(my_dcel):
-    p = vehicle.get_xy_lists()
-    draw_rectangle(p)
-    # draw_car_perpendicular_line(vehicle)
-    for face in my_dcel.faces:
-        vertices = get_face_vertices(face)
-        x = [x for x, y in vertices]
-        y = [y for x, y in vertices]
-        plt.fill(x, y, color=face.fill_color)
-        for vertex in vertices:
-            plt.scatter(vertex[0], vertex[1])
-    draw_vehicle(vehicle)
-    plt.show()
-
-
-def simulate(my_dcel, vehicles, frames, fn):
-    current_face = my_dcel.faces[0]
-    vehicle.error_point, vehicle.error = get_error(vehicle, current_face)
-    x_list, y_list = [], []
-    for V in vehicles:
-        # get the x and y coordinates for the current vehicle
-        x, y = V.get_xy_lists()
-        # append the x and y coordinates to the lists
-        x_list.append(x)
-        y_list.append(y)
-
-    lines = []
-    texts = []
-    for j in range(len(vehicles)):
-        line, = ax.plot(x_list[j], y_list[j])
-        text = ax.text(vehicles[j].centroid.x, vehicles[j].centroid.y, vehicles[j].velocity.norm())
-        text.set_size(8)
-        lines.append(line)  # storing all 2d lines (rectangles) in a list
-        texts.append(text)
-
-    def init():
-        lines[0].set_data(x_list[0], y_list[0])
-        texts[0].set_text(f'{vehicles[0].velocity.norm()} km/h')
-        texts[0].set_position((vehicles[0].centroid.x, vehicles[0].centroid.y))
-        return lines + texts
-
-    def animate(i):
-        for count, V in enumerate(vehicles):
-            # update the state variables for each vehicle
-            V.update_state_vars()
-            # get the updated x and y coordinates for the current vehicle
-            x, y = V.get_xy_lists()
-            # update the x and y lists with the updated coordinates
-            x_list[count] = x
-            y_list[count] = y
-            # leaving a trail behind the vehicle
-            # if i%5==0:
-            #   axis.plot(x[3], y[3], marker=".",markersize=1,markerfacecolor="black")
-
-        # update all lines with the updated x and y lists
-        for j in range(len(vehicles)):
-            lines[j].set_data(x_list[j], y_list[j])
-            texts[j].set_text(f'{int(vehicles[j].velocity.norm())} km/h')
-            # texts[j].set_text(f'{Vs[j].centroid.x} {Vs[j].centroid.y}')
-            x, y = vehicles[j].centroid.x, vehicles[j].centroid.y
-            texts[j].set_position((x, y))
-        # update axis limit to keep the vehicles in view
-        vehicle_xs = [element for sublist in x_list for element in sublist]
-        vehicle_ys = [element for sublist in y_list for element in sublist]
-        ax.set_xlim(min(vehicle_xs) - 5, max(vehicle_xs) + 5)
-        ax.set_ylim(min(vehicle_ys) - 5, max(vehicle_ys) + 5)
-        return lines + texts
-
-    anim = FuncAnimation(fig, animate, init_func=init,
-                         frames=frames, blit=True)
-
-    anim.save(fn, writer='ffmpeg', fps=30)
-
-
 def get_vertices_list(vertices):
     return [(vertex.x, vertex.y) for vertex in vertices]
 
 
 def write_vertices_to_file(vertices):
-    with open("vertices1.txt", "w") as file:
+    with open("vertices.txt", "w") as file:
         for vertex in vertices:
             for coordinate in vertex:
                 file.write(str(coordinate) + "\t")
@@ -128,7 +38,7 @@ def write_vertices_to_file(vertices):
 
 def load_vertices_from_file():
     vertices = []
-    with open("vertices1.txt", "r") as file:
+    with open("vertices.txt", "r") as file:
         for line in file:
             vertex = tuple(int(x) for x in line.strip().split("\t"))
             vertices.append(vertex)
@@ -136,7 +46,7 @@ def load_vertices_from_file():
 
 
 def write_segments_to_file(segments):
-    with open("segments1.txt", "w") as file:
+    with open("segments.txt", "w") as file:
         for segment in segments:
             for vertices in segment:
                 for vertex in vertices:
@@ -146,32 +56,12 @@ def write_segments_to_file(segments):
 
 def load_segments_from_file():
     segments = []
-    with open("segments1.txt", "r") as file:
+    with open("segments.txt", "r") as file:
         for line in file:
-            segment = []
             vertices = [int(x) for x in line.strip().split("\t")]
-            segment.append((vertices[0], vertices[1]))
-            segment.append((vertices[2], vertices[3]))
+            segment = [(vertices[0], vertices[1]), (vertices[2], vertices[3])]
             segments.append(segment)
     return segments
-
-
-def get_car_perpendicular_line(vehicle):
-    x, y = vehicle.get_xy_lists()
-    x1, x2 = x[0], x[1]
-    y1, y2 = y[0], y[1]
-
-    return [(x1, y1), (x2, y2)]
-
-
-def draw_car_perpendicular_line(vehicle):
-    segment = get_car_perpendicular_line(vehicle)
-    color = (211, 211, 211)  # light grey
-    x1 = 0
-    y1 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x1)
-    x2 = screen_width
-    y2 = get_y_at_x((segment[0][0], segment[0][1]), (segment[1][0], segment[1][1]), x2)
-    pygame.draw.line(screen, color, (x1, y1), (x2, y2))
 
 
 def get_vertices_and_segments():
@@ -181,19 +71,18 @@ def get_vertices_and_segments():
     vertices = []
     segments = []
     first = True
-    run = True
-    # Snap the points to the nearest grid point
     grid_spacing = 5
-    while run:
+    while True:
+        # if keyboard.is_pressed('d'):
+        #     return vertices, segments
+
         point = fig.ginput(n=1, show_clicks=True, mouse_add=1)
+        if len(point) == 0:
+            continue
         x = round(point[0][0] / grid_spacing) * grid_spacing
         y = round(point[0][1] / grid_spacing) * grid_spacing
         if (x, y) not in vertices:
             vertices.append((x, y))
-        # Print the snapped coordinates of the mouse clicks
-        # print(list(zip(x, y)))
-
-        # Plot the snapped points on the figure
         if not first:
             plt.plot([x, prev_x], [y, prev_y], 'o-')
             segment = [(prev_x, prev_y), (x, y)]
@@ -201,21 +90,19 @@ def get_vertices_and_segments():
                 segments.append(segment)
         else:
             plt.plot(x, y, 'o-')
-        # Display the resulting plot
         plt.draw()
+        if first and prev_x == x and prev_y == y:
+            return vertices, segments
+        first = prev_x == x and prev_y == y
         prev_x = x
         prev_y = y
-        first = bool(keyboard.is_pressed('space'))
-        if keyboard.is_pressed('d'):
-            run = False
-    return vertices, segments
 
 
 def main():
     vertices, segments = get_vertices_and_segments()
     dcel_obj = dcel.Dcel()
     dcel_obj.build_dcel(vertices, segments)
-    show_dcel(dcel_obj)
+    dcel_obj.show_dcel()
     write_vertices_to_file(vertices)
     write_segments_to_file(segments)
 
@@ -224,7 +111,7 @@ def get_m_and_b(segment):
     x1, y1 = segment[0]
     x2, y2 = segment[1]
 
-    if x2-x1 == 0:
+    if x2 - x1 == 0:
         m = "inf"
         b = 0
     else:
@@ -235,7 +122,7 @@ def get_m_and_b(segment):
 
 def get_y_at_x(origin, destination, x):
     m, b = get_m_and_b([origin, destination])
-    return m*x + b
+    return m * x + b
 
 
 def get_intersection_point(segment1, segment2):
@@ -243,14 +130,14 @@ def get_intersection_point(segment1, segment2):
     m2, b2 = get_m_and_b(segment2)
     if m1 != "inf" and m2 != "inf" and m1 - m2 == 0:
         return [None]
-    if m1 == "inf":     # vertical line
+    if m1 == "inf":  # vertical line
         x = segment1[0][0]
         y = get_y_at_x((segment2[0][0], segment2[0][1]), (segment2[1][0], segment2[1][1]), x)
-    elif m2 == "inf":   # vertical line
+    elif m2 == "inf":  # vertical line
         x = segment2[0][0]
         # get x at y
         y = get_y_at_x((segment1[0][0], segment1[0][1]), (segment1[1][0], segment1[1][1]), x)
-    elif m1 == 0:         # horizontal line y = c
+    elif m1 == 0:  # horizontal line y = c
         y = segment1[0][1]
         x = get_y_at_x((segment2[0][1], segment2[0][0]), (segment2[1][1], segment2[1][0]), y)
     elif m2 == 0:
@@ -258,7 +145,7 @@ def get_intersection_point(segment1, segment2):
         x = get_y_at_x((segment1[0][1], segment1[0][0]), (segment1[1][1], segment1[1][0]), y)
     else:
         x = (b2 - b1) / (m1 - m2)
-        y = m1*x + b1
+        y = m1 * x + b1
     return [x, y]
 
 
@@ -269,44 +156,50 @@ def x_lies_between(x1, x2, x):
 
 
 def get_mid_point(segment):
-    return (segment[0][0] + segment[1][0])/2, (segment[0][1] + segment[1][1])/2
+    return (segment[0][0] + segment[1][0]) / 2, (segment[0][1] + segment[1][1]) / 2
 
 
 def get_point_distance(point1, point2):
-    return math.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+    return math.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2)
 
 
-def get_error(vehicle, face):
+def get_face_intersection_points(vehicle):
+    face = vehicle.current_face
     half_edge = face.outer_component
     intersection_points = []
     first_iteration = True
     while first_iteration or half_edge is not face.outer_component:
         first_iteration = False
         segment1 = [(half_edge.origin.x, half_edge.origin.y), (half_edge.destination.x, half_edge.destination.y)]
-        segment2 = get_car_perpendicular_line(vehicle)
+        segment2 = vehicle.get_car_perpendicular_line()
         intersection_point = get_intersection_point(segment1, segment2)
         if (
-            intersection_point[0] is not None
-            and x_lies_between(
-                x1=half_edge.origin.x,
-                x2=half_edge.destination.x,
-                x=intersection_point[0],
-            )
-            and x_lies_between(
-                x1=half_edge.origin.y,
-                x2=half_edge.destination.y,
-                x=intersection_point[1],
-            )
+                intersection_point[0] is not None
+                and x_lies_between(
+                    x1=half_edge.origin.x,
+                    x2=half_edge.destination.x,
+                    x=intersection_point[0],
+                    )
+                and x_lies_between(
+                    x1=half_edge.origin.y,
+                    x2=half_edge.destination.y,
+                    x=intersection_point[1],
+                    )
         ):
             intersection_points.append((intersection_point[0], intersection_point[1]))
 
         half_edge = half_edge.next
+    return intersection_points
+
+
+def get_error(vehicle):
+    intersection_points = get_face_intersection_points(vehicle)
     if len(intersection_points) < 2:
         return (0, 0), 0
     mid_point_x, mid_point_y = get_mid_point([(intersection_points[0][0], intersection_points[0][1]),
-                                              (intersection_points[1][0], intersection_points[1][1])])
-    segment = get_car_perpendicular_line(vehicle)
-    vehicle_x = (segment[0][0] + segment[1][0])/2
+                                            (intersection_points[1][0], intersection_points[1][1])])
+    segment = vehicle.get_car_perpendicular_line()
+    vehicle_x = (segment[0][0] + segment[1][0]) / 2
     vehicle_y = (segment[0][1] + segment[1][1]) / 2
     return (mid_point_x, mid_point_y), \
         get_point_distance((mid_point_x, mid_point_y), (vehicle_x, vehicle_y))
@@ -321,9 +214,71 @@ def build_dcel_from_file():
     return my_dcel
 
 
-main()
-# my_dcel = build_dcel_from_file()
-# show_dcel(my_dcel)
-# Vs = [vehicle]
-# simulate(my_dcel, Vs, frames=500, fn="simulation6.mp4")
+def simulate(my_dcel, vehicle, frames, fn):
+    fig = plt.figure()
 
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+    lines = []
+    text = ax.text(0, 80, vehicle.error)
+    for count, face in enumerate(my_dcel.faces):
+        vertices = face.get_face_vertices()
+        x = [x for x, y in vertices]
+        x.append(vertices[0][0])
+        y = [y for x, y in vertices]
+        y.append(vertices[0][1])
+        line, = ax.plot(x, y)
+        lines.append(line)
+
+    def init():
+        return lines
+
+    vehicle_line, = ax.plot([], [])
+    acc_line, = ax.plot([], [])
+    velocity_line, = ax.plot([], [])
+    intersection_points = ax.scatter([], [], color='red', s=5)
+
+    def animate(i):
+        vehicle.update_state_vars()
+        vehicle_x, vehicle_y = vehicle.get_car_mid_point()
+        vehicle.current_face = my_dcel.get_face_for_point((vehicle_x, vehicle_y))
+        if vehicle.current_face is not None:
+            intersection_points_list = get_face_intersection_points(vehicle)
+            vehicle.face_mid_point, vehicle.error = get_error(vehicle)
+
+            text.set_text(str(vehicle.error) + '\n' + str(vehicle.theta))
+
+            x, y = vehicle.get_xy_lists()
+            vehicle_line.set_data(x, y)
+
+            x = [vehicle_x, vehicle.velocity.x + vehicle_x]
+            y = [vehicle_y, vehicle.velocity.y + vehicle_y]
+            velocity_line.set_data(x, y)
+            velocity_line.set_marker('>')
+            velocity_line.set_markersize(3)
+            velocity_line.set_markevery((len(x) - 1, len(x) - 1))
+
+            x = [vehicle_x, vehicle.acc.x + vehicle_x]
+            y = [vehicle_y, vehicle.acc.y + vehicle_y]
+            acc_line.set_data(x, y)
+            acc_line.set_marker('>')
+            acc_line.set_markersize(3)
+            acc_line.set_markevery((len(x) - 1, len(x) - 1))
+
+            intersection_x = [t[0] for t in intersection_points_list]
+            intersection_x.append(vehicle.face_mid_point[0])
+            intersection_y = [t[1] for t in intersection_points_list]
+            intersection_y.append(vehicle.face_mid_point[1])
+            intersection_points.set_offsets(np.c_[intersection_x, intersection_y])
+
+        return vehicle_line, velocity_line, acc_line, intersection_points, text
+
+    anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
+
+    anim.save(fn, writer='ffmpeg', fps=30)
+
+
+# main()
+my_dcel = build_dcel_from_file()
+# my_dcel.show_dcel()
+simulate(my_dcel, vehicle, frames=2000, fn="simulation5.mp4")
