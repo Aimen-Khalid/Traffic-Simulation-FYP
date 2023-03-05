@@ -225,6 +225,8 @@ def get_face_intersection_points(vehicle):
 
 
 def get_closest_intersection_points(vehicle):
+    closest_point_1 = (0, 0)
+    closest_point_2 = (0, 0)
     vehicle_x, vehicle_y = vehicle.get_car_mid_point()
     line_start = (vehicle_x, vehicle_y)
     line_end = (vehicle.velocity.get_x() + vehicle_x, vehicle.velocity.get_y() + vehicle_y)
@@ -271,22 +273,6 @@ def build_dcel_from_file():
     return my_dcel
 
 
-def compute(my_dcel, vehicle, frames):
-    list_of_lines = []
-    for _ in range(frames):
-        lines = []
-
-        for face in my_dcel.faces:
-            vertices = face.get_face_vertices()
-            x = [x for x, y in vertices]
-            x.append(vertices[0][0])
-            y = [y for x, y in vertices]
-            y.append(vertices[0][1])
-            line, = ax.plot(x, y)
-            lines.append(line)
-        list_of_lines.append(lines)
-
-
 def compute_arrays(my_dcel, vehicle, frames):
     arrays = {
         'vehicle': [],
@@ -310,7 +296,7 @@ def compute_arrays(my_dcel, vehicle, frames):
 
             dist = 0
             dist2 = 0
-            if len(intersection_points_list) > 2:
+            if len(intersection_points_list) >= 2:
                 dist = math.sqrt((vehicle_x - intersection_points_list[0][0])**2 +
                                  (vehicle_y - intersection_points_list[0][1])**2)
                 dist2 = math.sqrt((vehicle_x - intersection_points_list[1][0])**2 +
@@ -319,7 +305,7 @@ def compute_arrays(my_dcel, vehicle, frames):
             vehicle.update_state_vars(dist, dist2)
 
             text = (f'acc: {str(vehicle.acc.norm())}'
-                            + '\nTHETA: ' + str(vehicle.theta)
+                            + '\ntheta: ' + str(vehicle.theta)
                             + '\nVelocity: ' + str(vehicle.velocity.norm())
                             + '\nDist: ' + str(dist)
                             + '\nDist2: ' + str(dist2))
@@ -374,10 +360,10 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
 
         text.set_text(arrays['text'][i])
 
-        if i % 30 == 0:
-            trail = ax.scatter([], [], color='grey', s=0.3)
-            trail.set_offsets(arrays['trail'][i])
-            return vehicle_line, velocity_line, acc_line, intersection_points, trail, text
+        # if i % 30 == 0:
+        #     trail = ax.scatter([], [], color='grey', s=0.3)
+        #     trail.set_offsets(arrays['trail'][i])
+        #     return vehicle_line, velocity_line, acc_line, intersection_points, trail, text
         return vehicle_line, velocity_line, acc_line, intersection_points, text
 
     print("Simulation is being created...")
@@ -388,6 +374,6 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
 
 my_dcel = build_dcel_from_file()
 # my_dcel.show_dcel()
-frames = 1000
+frames = 2000
 arrays = compute_arrays(my_dcel, vehicle, frames)
 simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation26.mp4")

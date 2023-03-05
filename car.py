@@ -4,7 +4,7 @@ from math import cos, sin, radians
 from point import ScaledPoint
 dt = 0.01
 
-road_threshold = 10
+road_threshold = 25
 
 
 # utility functions
@@ -61,7 +61,7 @@ class Vehicle:
         self.length = length
         self.width = width
         self.speed_limit = 80
-        self.acc_limit = 40
+        self.acc_limit = 60
         # state variables
         self.centroid = centroid
         self.angle = angle
@@ -126,7 +126,6 @@ class Vehicle:
         else:
             self.theta = -1*abs(self.theta)
 
-        theta_weight = 1
         if dist < road_threshold or dist2 < road_threshold:
             theta_weight = 1.5
             theta_weight *= self.error
@@ -136,9 +135,10 @@ class Vehicle:
             elif self.theta < -90:
                 self.theta = -90
 
-        self.acc = get_vector((self.theta + (self.angle * 180 / math.pi)), self.error)
+        self.theta = self.theta + (self.angle * 180 / math.pi)
+        self.acc = get_vector(self.theta, self.error)
         self.integral_acc = self.integral_acc + self.acc
-        self.acc = self.acc  #+ self.integral_acc
+        self.acc = self.acc # + self.integral_acc
         return self.acc
 
     def update_state_vars(self, dist, dist2):
