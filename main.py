@@ -388,6 +388,6 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
 
 my_dcel = build_dcel_from_file()
 # my_dcel.show_dcel()
-frames = 5000
+frames = 1000
 arrays = compute_arrays(my_dcel, vehicle, frames)
 simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation26.mp4")

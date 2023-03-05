@@ -128,7 +128,7 @@ class Vehicle:
 
         theta_weight = 1
         if dist < road_threshold or dist2 < road_threshold:
-            # theta_weight = 1.5
+            theta_weight = 1.5
             theta_weight *= self.error
             self.theta *= theta_weight
             if self.theta > 90:
@@ -138,7 +138,7 @@ class Vehicle:
 
         self.acc = get_vector((self.theta + (self.angle * 180 / math.pi)), self.error)
         self.integral_acc = self.integral_acc + self.acc
-        self.acc = self.acc  # + self.integral_acc
+        self.acc = self.acc  #+ self.integral_acc
         return self.acc
 
     def update_state_vars(self, dist, dist2):
