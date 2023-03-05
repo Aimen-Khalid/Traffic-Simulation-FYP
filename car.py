@@ -1,46 +1,24 @@
 import math
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
-import numpy as np
+from point import ScaledPoint
 dt = 0.01
 
-
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __add__(self, p):
-        return Point(self.x + p.x, self.y + p.y)
-
-    def __sub__(self, p):
-        return Point(self.x - p.x, self.y - p.y)
-
-    def __mul__(self, s):
-        return Point(self.x * s, self.y * s)
-
-    def __truediv__(self, s):
-        return Point(self.x / s, self.y / s) if s != 0 else self
-
-    def __repr__(self):
-        return f"({str(self.x)},{str(self.y)})"
-
-    def norm(self):
-        return math.sqrt(self.x**2+self.y**2)
+road_threshold = 10
 
 
 # utility functions
 # returns a unit vector perpendicular to the input vector V
 def get_orthogonal_unit_vector(vector):   # V is an instance of point class
-    if vector.y == 0:
-        return Point(0, 1)
+    if vector.get_y() == 0:
+        return ScaledPoint(0, 1)
     v1 = 5
     # using the fact that dot product of perpendicular vectors is 0
-    v2 = -vector.x / vector.y * v1
+    v2 = -vector.get_x() / vector.get_y() * v1
     magnitude = math.sqrt(v1**2+v2**2)
     v2 /= magnitude
     v1 /= magnitude
-    return Point(v1, v2)
+    return ScaledPoint(v1, v2)
 
 
 def print_points(points):
@@ -50,60 +28,59 @@ def print_points(points):
 
 def get_vector(direction, magnitude):
     angle = radians(direction)  # angle the velocity vector makes with x-axis
-    vector_direction = Point(cos(angle), sin(angle))  # unit vector in the direction of velocity
+    vector_direction = ScaledPoint(cos(angle), sin(angle))  # unit vector in the direction of velocity
     return vector_direction * magnitude
 
 
 def get_avg_centroid(vehicles):
-    avg_centroid = Point(0, 0)
+    avg_centroid = ScaledPoint(0, 0)
     for v_ in vehicles:
         avg_centroid += v_.centroid
     return avg_centroid/len(vehicles)
 
 
 def point_above_line(point, line_start, line_end):
-    # Calculate the vector from the line start to the point
-    p1 = np.array(line_start)
-    p2 = np.array(point)
-    p3 = np.array(line_end)
-    v1 = p2 - p1
+    return point[1] > line_start[1]
 
-    # Calculate the vector from the line start to the line end
-    v2 = p3 - p1
 
-    # Calculate the cross product
-    cross_product = np.cross(v1, v2)
-    # If the cross product is positive, the point is above the line
-    return cross_product > 0
+def point_line_side(point, line_start, line_end):
+    dx = line_end[0] - line_start[0]
+    dy = line_end[1] - line_start[1]
+    dx1 = point[0] - line_start[0]
+    dy1 = point[1] - line_start[1]
+    cross_product = dx * dy1 - dy * dx1
+    return cross_product > 0 or cross_product >= 0
 
 
 class Vehicle:
     theta = 45
 
-    def __init__(self, length, width, speed_limit, acc_limit, centroid, angle, v, a, error=Point(0, 0),
+    def __init__(self, length, width, speed_limit, acc_limit, centroid, angle, v, a, error=ScaledPoint(0, 0),
                  current_face=None):
         # parameters
         self.length = length
         self.width = width
-        self.speed_limit = speed_limit
-        self.acc_limit = acc_limit
+        self.speed_limit = 80
+        self.acc_limit = 40
         # state variables
         self.centroid = centroid
         self.angle = angle
         self.velocity = v
         self.acc = a
+        self.integral_acc = ScaledPoint(0, 0)
         self.max_force = 0.5
         self.error_point = error
         self.error = 0
         self.current_face = current_face
+        self.prev_face = None
         self.face_mid_point = None
 
     # uses centroid and angle of vehicle to return its 4 points
     def state_to_corners(self):
-        dir_vect = Point(cos(self.angle), sin(self.angle))
+        dir_vect = ScaledPoint(cos(self.angle), sin(self.angle))
         dir_vect = dir_vect * (self.length / 2)
         orthogonal_vect = get_orthogonal_unit_vector(dir_vect)
-        orthogonal_vect = Point(orthogonal_vect.x * self.width / 2, orthogonal_vect.y * self.width / 2)
+        orthogonal_vect = ScaledPoint(orthogonal_vect.get_x() * self.width / 2, orthogonal_vect.get_y() * self.width / 2)
         return [
             self.centroid + dir_vect + orthogonal_vect,
             self.centroid + dir_vect - orthogonal_vect,
@@ -137,29 +114,52 @@ class Vehicle:
                     v2 = j
         return v1, v2
 
-    def controller(self):
-        vehicle_x, vehicle_y = self.get_car_mid_point()
-        line_start = (vehicle_x, vehicle_y)
-        line_end = (self.velocity.x, self.velocity.y)
+    def controller(self, dist, dist2):
+        self.theta = 45
         if self.face_mid_point is None:
             return self.acc
-        if point_above_line(self.face_mid_point, line_start, line_end):
-            self.theta = -1 * abs(self.theta)
-        else:
+        vehicle_x, vehicle_y = self.get_car_mid_point()
+        line_start = (vehicle_x, vehicle_y)
+        line_end = (self.velocity.get_x() + vehicle_x, self.velocity.get_y() + vehicle_y)
+        if point_line_side(self.face_mid_point, line_start, line_end):
             self.theta = abs(self.theta)
-        self.acc = get_vector(-1 * (self.theta + (self.angle * 180 / math.pi)), self.error * 15)
+        else:
+            self.theta = -1*abs(self.theta)
+
+        theta_weight = 1
+        if dist < road_threshold or dist2 < road_threshold:
+            # theta_weight = 1.5
+            theta_weight *= self.error
+            self.theta *= theta_weight
+            if self.theta > 90:
+                self.theta = 90
+            elif self.theta < -90:
+                self.theta = -90
+
+        self.acc = get_vector((self.theta + (self.angle * 180 / math.pi)), self.error)
+        self.integral_acc = self.integral_acc + self.acc
+        self.acc = self.acc  # + self.integral_acc
         return self.acc
 
-    def update_state_vars(self):
-        self.velocity += (self.controller() * dt)
+    def update_state_vars(self, dist, dist2):
+        self.controller(dist, dist2)
+        if self.acc.norm() > self.acc_limit:
+            self.acc /= self.acc.norm()
+            self.acc *= self.acc_limit
+        self.velocity += (self.acc * dt)
+        # self.velocity *= 2
+        if self.velocity.norm() > self.speed_limit:
+            self.velocity /= self.velocity.norm()
+            self.velocity *= self.speed_limit
         self.centroid += self.velocity * dt
-        self.angle = math.atan2(self.velocity.y, self.velocity.x)
+        self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
+        # self.velocity = get_vector(math.atan2(self.velocity.get_y(), self.velocity.get_x()), 20)
 
     def get_xy_lists(self):
         p = self.state_to_corners()
-        x, y = [p[i].x for i in range(4)], [p[i].y for i in range(4)]
-        x.append(p[0].x)
-        y.append(p[0].y)
+        x, y = [p[i].get_x() for i in range(4)], [p[i].get_y() for i in range(4)]
+        x.append(p[0].get_x())
+        y.append(p[0].get_y())
         return x, y
 
     def draw_vehicle(self):
@@ -179,3 +179,4 @@ class Vehicle:
         y1, y2 = y[0], y[1]
 
         return [(x1, y1), (x2, y2)]
+

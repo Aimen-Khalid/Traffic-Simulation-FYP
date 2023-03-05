@@ -10,6 +10,7 @@ class Face:
         self.outer_component = None  # One half edge of the outer-cycle
         self.fill_color = (random.random(), random.random(), random.random())
         self.polygon = None
+        self.inner_components = []
 
     def get_face_vertices(self):
         hedge = self.outer_component
@@ -213,13 +214,13 @@ class Dcel:
         self.__add_next_and_previous_pointers()
         self.__add_face_pointers()
         self.__create_outer_face(points)
+        self.__set_polygons()
+        self.__set_faces_inner_components()
+
+    def __set_polygons(self):
         for face in self.faces:
             vertices = face.get_face_vertices()
             face.polygon = Polygon(list(vertices))
-            # print(face.polygon)
-            # x, y = face.polygon.exterior.xy
-            # plt.plot(x, y)
-            # plt.show()
 
     def show_dcel(self):
         for face in self.faces:
@@ -375,3 +376,15 @@ class Dcel:
         while not h.next == max_face.outer_component:
             h = h.next
             h.incident_face = self.outer_face
+
+    def __set_faces_inner_components(self):
+        for i, face1 in enumerate(self.faces):
+            for j in range(i + 1, len(self.faces)):
+                face2 = self.faces[j]
+
+                # Check if face1 is contained within face2 or vice versa
+                if face1.polygon.within(face2.polygon) and face1 != face2:
+                    face2.inner_components.append(face1)
+                elif face2.polygon.within(face1.polygon) and face1 != face2:
+                    face1.inner_components.append(face2)
+
