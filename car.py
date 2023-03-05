@@ -140,14 +140,14 @@ class Vehicle:
     def controller(self):
         vehicle_x, vehicle_y = self.get_car_mid_point()
         line_start = (vehicle_x, vehicle_y)
-        line_end = (self.velocity.x, self.velocity.y)
+        line_end = (self.velocity.x + vehicle_x, self.velocity.y + vehicle_y)
         if self.face_mid_point is None:
             return self.acc
-        if point_above_line(self.face_mid_point, line_start, line_end):
-            self.theta = -1 * abs(self.theta)
-        else:
-            self.theta = abs(self.theta)
-        self.acc = get_vector(-1 * (self.theta + (self.angle * 180 / math.pi)), self.error * 15)
+        if point_above_line(self.face_mid_point, line_start, line_end): # agar mid_point hai oper
+            self.theta = abs(self.theta)  # angle positive
+        else:  # agar mid_point nechay hai
+            self.theta = -1*abs(self.theta) # angle negative
+        self.acc = get_vector(-1 * (self.theta + (self.angle * 180 / math.pi)), self.error)
         return self.acc
 
     def update_state_vars(self):

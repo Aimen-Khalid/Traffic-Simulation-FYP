@@ -15,8 +15,8 @@ ax.xaxis.set_ticks(range(0, 200, 5))
 ax.yaxis.set_ticks(range(0, 100, 5))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
-vehicle = car.Vehicle(length=10, width=5, speed_limit=0, acc_limit=0, centroid=car.Point(30, 25),
-                      angle=5, v=car.Point(5, -5), a=car.Point(0, 0))
+vehicle = car.Vehicle(length=5, width=3, speed_limit=0, acc_limit=0, centroid=car.Point(80, 30),
+                      angle=5, v=car.Point(1, 1), a=car.Point(0, 0))
 
 
 def draw_rectangle(p):
@@ -245,7 +245,8 @@ def simulate(my_dcel, vehicle, frames, fn):
         if vehicle.current_face is not None:
             intersection_points_list = get_face_intersection_points(vehicle)
             vehicle.face_mid_point, vehicle.error = get_error(vehicle)
-
+            # vehicle.error *= math.sqrt((vehicle.face_mid_point[0] - intersection_points_list[0][0])**2
+            #                            + (vehicle.face_mid_point[1] - intersection_points_list[0][1])**2)
             text.set_text(str(vehicle.error) + '\n' + str(vehicle.theta))
 
             x, y = vehicle.get_xy_lists()
@@ -280,5 +281,4 @@ def simulate(my_dcel, vehicle, frames, fn):
 
 # main()
 my_dcel = build_dcel_from_file()
-# my_dcel.show_dcel()
 simulate(my_dcel, vehicle, frames=2000, fn="simulation5.mp4")
