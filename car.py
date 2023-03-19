@@ -43,7 +43,7 @@ def point_above_line(point, line_start, line_end):
     return point[1] > line_start[1]
 
 
-def point_line_side(point, line_start, line_end):
+def point_lies_left(point, line_start, line_end):
     dx = line_end[0] - line_start[0]
     dy = line_end[1] - line_start[1]
     dx1 = point[0] - line_start[0]
@@ -61,16 +61,17 @@ class Vehicle:
         self.length = length
         self.width = width
         self.speed_limit = 80
-        self.acc_limit = 60
+        self.acc_limit = 40
         # state variables
         self.centroid = centroid
         self.angle = angle
         self.velocity = v
         self.acc = a
-        self.integral_acc = ScaledPoint(0, 0)
+        self.integral_acc = 0
         self.max_force = 0.5
         self.error_point = error
         self.error = 0
+        self.prev_error = 0
         self.current_face = current_face
         self.prev_face = None
         self.face_mid_point = None
@@ -121,11 +122,12 @@ class Vehicle:
         vehicle_x, vehicle_y = self.get_car_mid_point()
         line_start = (vehicle_x, vehicle_y)
         line_end = (self.velocity.get_x() + vehicle_x, self.velocity.get_y() + vehicle_y)
-        if point_line_side(self.face_mid_point, line_start, line_end):
+        if point_lies_left(self.face_mid_point, line_start, line_end):
             self.theta = abs(self.theta)
         else:
             self.theta = -1*abs(self.theta)
 
+        # self.theta = self.theta + (self.angle * 180 / math.pi)
         if dist < road_threshold or dist2 < road_threshold:
             theta_weight = 1.5
             theta_weight *= self.error
@@ -135,10 +137,11 @@ class Vehicle:
             elif self.theta < -90:
                 self.theta = -90
 
-        self.theta = self.theta + (self.angle * 180 / math.pi)
-        self.acc = get_vector(self.theta, self.error)
-        self.integral_acc = self.integral_acc + self.acc
-        self.acc = self.acc # + self.integral_acc
+        acc_magnitude = self.error
+        deriv_acc = self.error - self.prev_error
+        self.integral_acc = self.integral_acc + acc_magnitude
+        self.acc = get_vector(self.theta + (self.angle * 180 / math.pi), (acc_magnitude + 1000*deriv_acc))
+        # self.acc = self.acc + (self.integral_acc * 0.001)
         return self.acc
 
     def update_state_vars(self, dist, dist2):

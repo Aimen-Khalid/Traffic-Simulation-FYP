@@ -30,3 +30,5 @@ class ScaledPoint:
     def get_y(self):
         return self.point.y
 
+
+

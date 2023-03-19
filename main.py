@@ -4,7 +4,7 @@ import dcel
 import car
 from point import ScaledPoint
 import matplotlib.pyplot as plt
-from car import point_line_side
+from car import point_lies_left
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
@@ -18,7 +18,7 @@ ax.xaxis.set_ticks(range(0, 900, 30))
 ax.yaxis.set_ticks(range(0, 700, 30))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
-vehicle = car.Vehicle(length=20, width=10, speed_limit=0, acc_limit=0, centroid=ScaledPoint(420, 30),
+vehicle = car.Vehicle(length=20, width=10, speed_limit=0, acc_limit=0, centroid=ScaledPoint(420, 50),
                       angle=5, v=ScaledPoint(50, 5), a=ScaledPoint(0, 0))
 
 
@@ -235,7 +235,7 @@ def get_closest_intersection_points(vehicle):
     intersection_points = get_face_intersection_points(vehicle)
     for point in intersection_points:
         distance = sqrt((vehicle_x - point[0]) ** 2 + (vehicle_y - point[1]) ** 2)
-        if point_line_side(point, line_start, line_end):
+        if point_lies_left(point, line_start, line_end):
             if distance < min_distance_1:
                 min_distance_1 = distance
                 closest_point_1 = point
@@ -255,7 +255,8 @@ def get_error(vehicle):
     vehicle_x = (segment[0][0] + segment[1][0]) / 2
     vehicle_y = (segment[0][1] + segment[1][1]) / 2
     distance = get_point_distance((mid_point_x, mid_point_y), (vehicle_x, vehicle_y))
-
+    if point_lies_left((mid_point_x, mid_point_y), segment[0], segment[1]):
+        distance *= -1
     if distance < 1:
         distance *= 1000
     else:
@@ -280,23 +281,26 @@ def compute_arrays(my_dcel, vehicle, frames):
         'acc': [],
         'intersection_points': [],
         'text': [],
-        'trail': []
+        'trail_x': [],
+        'trail_y': []
     }
 
     for _ in range(frames):
         vehicle_x, vehicle_y = vehicle.get_car_mid_point()
-        arrays['trail'].append((vehicle_x, vehicle_y))
+        arrays['trail_x'].append(vehicle_x)
+        arrays['trail_y'].append(vehicle_y)
         vehicle.current_face = my_dcel.get_face_for_point((vehicle_x, vehicle_y))
         if vehicle.current_face is None:
             vehicle.current_face = vehicle.prev_face
         if vehicle.current_face is not None:
             vehicle.prev_face = vehicle.current_face
             intersection_points_list = get_closest_intersection_points(vehicle)
+            vehicle.prev_error = vehicle.error
             vehicle.face_mid_point, vehicle.error = get_error(vehicle)
 
             dist = 0
             dist2 = 0
-            if len(intersection_points_list) >= 2:
+            if len(intersection_points_list) > 2:
                 dist = math.sqrt((vehicle_x - intersection_points_list[0][0])**2 +
                                  (vehicle_y - intersection_points_list[0][1])**2)
                 dist2 = math.sqrt((vehicle_x - intersection_points_list[1][0])**2 +
@@ -344,6 +348,7 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
         lines.append(line)
 
     vehicle_line, = ax.plot([], [])
+    trail_line, = ax.plot([], [])
     acc_line, = ax.plot([], [])
     velocity_line, = ax.plot([], [])
     intersection_points = ax.scatter([], [], color='red', s=5)
@@ -355,6 +360,7 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
     def animate(i):
         vehicle_line.set_data(arrays['vehicle'][i])
         velocity_line.set_data(arrays['velocity'][i])
+        trail_line.set_data(arrays['trail_x'][:i], arrays['trail_y'][:i])
         acc_line.set_data(arrays['acc'][i])
         intersection_points.set_offsets(arrays['intersection_points'][i])
 
@@ -364,7 +370,7 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
         #     trail = ax.scatter([], [], color='grey', s=0.3)
         #     trail.set_offsets(arrays['trail'][i])
         #     return vehicle_line, velocity_line, acc_line, intersection_points, trail, text
-        return vehicle_line, velocity_line, acc_line, intersection_points, text
+        return vehicle_line, velocity_line, acc_line, intersection_points, text, trail_line
 
     print("Simulation is being created...")
     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
@@ -374,6 +380,6 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
 
 my_dcel = build_dcel_from_file()
 # my_dcel.show_dcel()
-frames = 2000
+frames = 3000
 arrays = compute_arrays(my_dcel, vehicle, frames)
-simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation26.mp4")
+simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation35.mp4")
