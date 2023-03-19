@@ -8,6 +8,7 @@ from car import point_lies_left
 from matplotlib.animation import FuncAnimation
 import numpy as np
 import time
+from tqdm import tqdm
 
 # Set the figure size and create the axis
 fig, ax = plt.subplots(figsize=(100, 100))
@@ -285,50 +286,51 @@ def compute_arrays(my_dcel, vehicle, frames):
         'trail_x': [],
         'trail_y': []
     }
+    with tqdm(total=frames) as pbar:
+        for _ in range(frames):
+            vehicle_x, vehicle_y = vehicle.get_car_mid_point()
+            arrays['trail_x'].append(vehicle_x)
+            arrays['trail_y'].append(vehicle_y)
+            vehicle.current_face = my_dcel.get_face_for_point((vehicle_x, vehicle_y))
+            if vehicle.current_face is None:
+                vehicle.current_face = vehicle.prev_face
+            if vehicle.current_face is not None:
+                vehicle.prev_face = vehicle.current_face
+                intersection_points_list = get_closest_intersection_points(vehicle)
+                vehicle.prev_error = vehicle.error
+                vehicle.face_mid_point, vehicle.error = get_error(vehicle)
 
-    for _ in range(frames):
-        vehicle_x, vehicle_y = vehicle.get_car_mid_point()
-        arrays['trail_x'].append(vehicle_x)
-        arrays['trail_y'].append(vehicle_y)
-        vehicle.current_face = my_dcel.get_face_for_point((vehicle_x, vehicle_y))
-        if vehicle.current_face is None:
-            vehicle.current_face = vehicle.prev_face
-        if vehicle.current_face is not None:
-            vehicle.prev_face = vehicle.current_face
-            intersection_points_list = get_closest_intersection_points(vehicle)
-            vehicle.prev_error = vehicle.error
-            vehicle.face_mid_point, vehicle.error = get_error(vehicle)
+                dist = 0
+                dist2 = 0
+                if len(intersection_points_list) > 2:
+                    dist = math.sqrt((vehicle_x - intersection_points_list[0][0])**2 +
+                                    (vehicle_y - intersection_points_list[0][1])**2)
+                    dist2 = math.sqrt((vehicle_x - intersection_points_list[1][0])**2 +
+                                    (vehicle_y - intersection_points_list[1][1])**2)
 
-            dist = 0
-            dist2 = 0
-            if len(intersection_points_list) > 2:
-                dist = math.sqrt((vehicle_x - intersection_points_list[0][0])**2 +
-                                 (vehicle_y - intersection_points_list[0][1])**2)
-                dist2 = math.sqrt((vehicle_x - intersection_points_list[1][0])**2 +
-                                  (vehicle_y - intersection_points_list[1][1])**2)
+                vehicle.update_state_vars(dist, dist2)
 
-            vehicle.update_state_vars(dist, dist2)
+                text = (f'acc: {str(vehicle.acc.norm())}'
+                                + '\ntheta: ' + str(vehicle.theta)
+                                + '\nVelocity: ' + str(vehicle.velocity.norm())
+                                + '\nDist: ' + str(dist)
+                                + '\nDist2: ' + str(dist2))
+                arrays['text'].append(text)
 
-            text = (f'acc: {str(vehicle.acc.norm())}'
-                            + '\ntheta: ' + str(vehicle.theta)
-                            + '\nVelocity: ' + str(vehicle.velocity.norm())
-                            + '\nDist: ' + str(dist)
-                            + '\nDist2: ' + str(dist2))
-            arrays['text'].append(text)
+                x, y = vehicle.get_xy_lists()
+                arrays['vehicle'].append((x, y))
 
-            x, y = vehicle.get_xy_lists()
-            arrays['vehicle'].append((x, y))
+                x = [vehicle_x, vehicle.velocity.get_x() + vehicle_x]
+                y = [vehicle_y, vehicle.velocity.get_y() + vehicle_y]
+                arrays['velocity'].append((x, y))
 
-            x = [vehicle_x, vehicle.velocity.get_x() + vehicle_x]
-            y = [vehicle_y, vehicle.velocity.get_y() + vehicle_y]
-            arrays['velocity'].append((x, y))
+                x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
+                y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
+                arrays['acc'].append((x, y))
 
-            x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
-            y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
-            arrays['acc'].append((x, y))
-
-            intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
-            arrays['intersection_points'].append(intersection_points_list)
+                intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
+                arrays['intersection_points'].append(intersection_points_list)
+            pbar.update(1)
 
     return arrays
 
@@ -385,10 +387,7 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
 my_dcel = build_dcel_from_file()
 # my_dcel.show_dcel()
 frames = 3000
-print("Simulation is being created...")
-start = time.time()
+
+print(f"Simulation Parameters Calculation for {frames} frames")
 arrays = compute_arrays(my_dcel, vehicle, frames)
-end = time.time()
-print("Simulation COMPLETE....")
-print(f"{int(end-start)} Seconds")
 simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation35.mp4")
