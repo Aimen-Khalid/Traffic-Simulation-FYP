@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from car import point_lies_left
 from matplotlib.animation import FuncAnimation
 import numpy as np
+import time
 
 # Set the figure size and create the axis
 fig, ax = plt.subplots(figsize=(100, 100))
@@ -372,14 +373,22 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
         #     return vehicle_line, velocity_line, acc_line, intersection_points, trail, text
         return vehicle_line, velocity_line, acc_line, intersection_points, text, trail_line
 
-    print("Simulation is being created...")
+    print("Animation is being created...")
+    start = time.time()
     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
     anim.save(fn, writer='ffmpeg', fps=60)
-    print("SIMULATION COMPLETE")
+    end = time.time()
+    print("Animation COMPLETE....")
+    print(f"{int(end-start)} Seconds")
 
 
 my_dcel = build_dcel_from_file()
 # my_dcel.show_dcel()
 frames = 3000
+print("Simulation is being created...")
+start = time.time()
 arrays = compute_arrays(my_dcel, vehicle, frames)
+end = time.time()
+print("Simulation COMPLETE....")
+print(f"{int(end-start)} Seconds")
 simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation35.mp4")
