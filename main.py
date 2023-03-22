@@ -331,6 +331,8 @@ def compute_arrays(my_dcel, vehicle, frames):
                 x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
                 y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
                 arrays['acc'].append((x, y))
+                arrays['acc_magnitude'].append(vehicle.acc_magnitude)
+                arrays['speed'].append(vehicle.speed)
 
                 intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
                 arrays['intersection_points'].append(intersection_points_list)
@@ -411,22 +413,23 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
     print(f"{int(end - start)} Seconds")
 
 
-# my_dcel = build_dcel_from_file()
-# # my_dcel.show_dcel()
-# frames = 800
-# print("Computation in progress...")
-# start = time.time()
-# arrays = compute_arrays(my_dcel, vehicle, frames)
-# end = time.time()
-# print(f"{int(end - start)} Seconds")
-# with open("acc.txt", "w") as file:
-#     for a in arrays['acc_magnitude']:
-#         file.write(f"{a}\n")
-# with open("speed.txt", "w") as file:
-#     for s in arrays['speed']:
-#         file.write(f"{s}\n")
+my_dcel = build_dcel_from_file()
+# my_dcel.show_dcel()
+frames = 800
+print("Computation in progress...")
+start = time.time()
+arrays = compute_arrays(my_dcel, vehicle, frames)
+end = time.time()
+print(f"{int(end - start)} Seconds")
+with open("acc.txt", "w") as file:
+    for a in arrays['acc_magnitude']:
+        file.write(f"{a}\n")
+with open("speed.txt", "w") as file:
+    for s in arrays['speed']:
+        file.write(f"{s}\n")
 acc = np.loadtxt("acc.txt")
 speed = np.loadtxt("speed.txt")
 limit = 800
 plot(acc[:limit], speed[:limit])
-# simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation.mp4")
+simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation.mp4")
+
