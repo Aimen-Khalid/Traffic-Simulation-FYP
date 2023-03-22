@@ -90,10 +90,7 @@ class Edge:
         return (self.destination.y - self.origin.y) / edge_x_width
 
     def point_lies_above_edge(self, point):
-        if point.y > self.get_y_at_x(point.x):
-            return True
-        else:
-            return False
+        return point.y > self.get_y_at_x(point.x)
 
     def point_lies_on_edge(self, point):
         if point.x < self.origin.x or point.x > self.destination.x:

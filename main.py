@@ -10,6 +10,10 @@ import numpy as np
 import time
 from tqdm import tqdm
 
+ROAD_EDGE_COLOR = 'black'
+ROAD_COLOR = 'white'
+TRAIL_COLOR = 'grey'
+
 # Set the figure size and create the axis
 fig, ax = plt.subplots(figsize=(100, 100))
 ax.set_aspect('equal')
@@ -78,9 +82,6 @@ def get_vertices_and_segments():
     first = True
     grid_spacing = 30
     while True:
-        # if keyboard.is_pressed('d'):
-        #     return vertices, segments
-
         point = fig.ginput(n=1, show_clicks=True, mouse_add=1)
         if len(point) == 0:
             continue
@@ -211,15 +212,15 @@ def get_face_intersection_points(vehicle):
         if (
                 intersection_point[0] is not None
                 and x_lies_between(
-                    x1=half_edge.origin.x,
-                    x2=half_edge.destination.x,
-                    x=intersection_point[0],
-                    )
+            x1=half_edge.origin.x,
+            x2=half_edge.destination.x,
+            x=intersection_point[0],
+        )
                 and x_lies_between(
-                    x1=half_edge.origin.y,
-                    x2=half_edge.destination.y,
-                    x=intersection_point[1],
-                    )
+            x1=half_edge.origin.y,
+            x2=half_edge.destination.y,
+            x=intersection_point[1],
+        )
         ):
             intersection_points.append((intersection_point[0], intersection_point[1]))
 
@@ -252,17 +253,17 @@ def get_error(vehicle):
     if len(intersection_points) < 2:
         return (0, 0), vehicle.error * 10
     mid_point_x, mid_point_y = get_mid_point([(intersection_points[0][0], intersection_points[0][1]),
-                                            (intersection_points[1][0], intersection_points[1][1])])
+                                              (intersection_points[1][0], intersection_points[1][1])])
     segment = vehicle.get_car_perpendicular_line()
     vehicle_x = (segment[0][0] + segment[1][0]) / 2
     vehicle_y = (segment[0][1] + segment[1][1]) / 2
     distance = get_point_distance((mid_point_x, mid_point_y), (vehicle_x, vehicle_y))
     if point_lies_left((mid_point_x, mid_point_y), segment[0], segment[1]):
         distance *= -1
-    if distance < 1:
-        distance *= 1000
-    else:
-        distance *= 10
+    # if distance < 1:
+    #     distance *= 1000
+    # else:
+    #     distance *= 10
 
     return (mid_point_x, mid_point_y), distance
 
@@ -280,7 +281,10 @@ def compute_arrays(my_dcel, vehicle, frames):
     arrays = {
         'vehicle': [],
         'velocity': [],
+        'speed': [],
         'acc': [],
+        'acc_magnitude': [],
+        'error': [],
         'intersection_points': [],
         'text': [],
         'trail_x': [],
@@ -335,59 +339,94 @@ def compute_arrays(my_dcel, vehicle, frames):
     return arrays
 
 
-def simulate(my_dcel, vehicle, frames, arrays, fn):
-    fig = plt.figure()
-
-    ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
-    lines = []
-    for count, face in enumerate(my_dcel.faces):
+def draw_roads(my_dcel, ax):
+    for face in my_dcel.faces:
         vertices = face.get_face_vertices()
         x = [x for x, y in vertices]
         x.append(vertices[0][0])
         y = [y for x, y in vertices]
         y.append(vertices[0][1])
-        line, = ax.plot(x, y)
-        lines.append(line)
+        ax.plot(x, y, color=ROAD_EDGE_COLOR)
+
+
+def plot(acc, speed):
+    fig = plt.figure(figsize=(10, 6))
+    frames = np.linspace(0, len(acc), len(acc))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(frames, acc)
+    ax.set_title(f"Acc Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
+    ax.set_xlabel("frames")
+    ax.set_ylabel("|acceleration|")
+    plt.show()
+
+    axis = plt.gca()
+    frames = np.linspace(0, len(speed), len(speed))
+    axis.set_aspect('equal', adjustable='box')
+    axis.plot(frames, speed)
+    axis.set_xlim([0, 500])
+    axis.set_ylim([-60, 60])
+    plt.title(f"Speed Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
+    plt.xlabel("frames")
+    plt.ylabel("speed")
+    plt.show()
+
+
+def simulate(my_dcel, vehicle, frames, arrays, fn):
+    fig = plt.figure()
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+
+    draw_roads(my_dcel, ax)
 
     vehicle_line, = ax.plot([], [])
-    trail_line, = ax.plot([], [])
+    trail_line, = ax.plot([], [], color=TRAIL_COLOR)
+    ideal_trail_line, = ax.plot([], [], color='green')
+
+    ideal_trail_line.set_data([arrays['intersection_points'][j][2][0] for j in range(len(arrays['intersection_points']))],
+                              [arrays['intersection_points'][j][2][1] for j in range(len(arrays['intersection_points']))])
     acc_line, = ax.plot([], [])
     velocity_line, = ax.plot([], [])
     intersection_points = ax.scatter([], [], color='red', s=5)
     text = ax.text(0, 80, vehicle.error)
 
     def init():
-        return lines + [vehicle_line, acc_line, velocity_line, intersection_points, text]
+        return vehicle_line, acc_line, velocity_line, intersection_points, text, ideal_trail_line
 
     def animate(i):
         vehicle_line.set_data(arrays['vehicle'][i])
         velocity_line.set_data(arrays['velocity'][i])
         trail_line.set_data(arrays['trail_x'][:i], arrays['trail_y'][:i])
+
         acc_line.set_data(arrays['acc'][i])
         intersection_points.set_offsets(arrays['intersection_points'][i])
-
         text.set_text(arrays['text'][i])
-
-        # if i % 30 == 0:
-        #     trail = ax.scatter([], [], color='grey', s=0.3)
-        #     trail.set_offsets(arrays['trail'][i])
-        #     return vehicle_line, velocity_line, acc_line, intersection_points, trail, text
         return vehicle_line, velocity_line, acc_line, intersection_points, text, trail_line
 
-    print("Animation is being created...")
+    print("Animation in progress...")
     start = time.time()
     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
-    anim.save(fn, writer='ffmpeg', fps=60)
+    anim.save(fn, writer='ffmpeg', fps=100)
     end = time.time()
-    print("Animation COMPLETE....")
-    print(f"{int(end-start)} Seconds")
+    print("Animation COMPLETED....")
+    print(f"{int(end - start)} Seconds")
 
 
-my_dcel = build_dcel_from_file()
-# my_dcel.show_dcel()
-frames = 3000
-
-print(f"Simulation Parameters Calculation for {frames} frames")
-arrays = compute_arrays(my_dcel, vehicle, frames)
-simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation35.mp4")
+# my_dcel = build_dcel_from_file()
+# # my_dcel.show_dcel()
+# frames = 800
+# print("Computation in progress...")
+# start = time.time()
+# arrays = compute_arrays(my_dcel, vehicle, frames)
+# end = time.time()
+# print(f"{int(end - start)} Seconds")
+# with open("acc.txt", "w") as file:
+#     for a in arrays['acc_magnitude']:
+#         file.write(f"{a}\n")
+# with open("speed.txt", "w") as file:
+#     for s in arrays['speed']:
+#         file.write(f"{s}\n")
+acc = np.loadtxt("acc.txt")
+speed = np.loadtxt("speed.txt")
+limit = 800
+plot(acc[:limit], speed[:limit])
+# simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation.mp4")

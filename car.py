@@ -2,9 +2,11 @@ import math
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
 from point import ScaledPoint
-dt = 0.01
 
-road_threshold = 25
+dt = 0.01
+ROAD_THRESHOLD = 25
+D_ACC_WEIGHT = 50
+P_ACC_WEIGHT = 0.5
 
 
 # utility functions
@@ -66,8 +68,10 @@ class Vehicle:
         self.centroid = centroid
         self.angle = angle
         self.velocity = v
+        self.speed = 0
         self.acc = a
         self.integral_acc = 0
+        self.acc_magnitude = 0
         self.max_force = 0.5
         self.error_point = error
         self.error = 0
@@ -127,8 +131,7 @@ class Vehicle:
         else:
             self.theta = -1*abs(self.theta)
 
-        # self.theta = self.theta + (self.angle * 180 / math.pi)
-        if dist < road_threshold or dist2 < road_threshold:
+        if dist < ROAD_THRESHOLD or dist2 < ROAD_THRESHOLD:
             theta_weight = 1.5
             theta_weight *= self.error
             self.theta *= theta_weight
@@ -137,11 +140,11 @@ class Vehicle:
             elif self.theta < -90:
                 self.theta = -90
 
-        acc_magnitude = self.error
-        deriv_acc = self.error - self.prev_error
-        self.integral_acc = self.integral_acc + acc_magnitude
-        self.acc = get_vector(self.theta + (self.angle * 180 / math.pi), (acc_magnitude + 1000*deriv_acc))
-        # self.acc = self.acc + (self.integral_acc * 0.001)
+        p_acc_magnitude = self.error
+        derivative_acc = self.error - self.prev_error
+        self.integral_acc = self.integral_acc + p_acc_magnitude
+        self.acc_magnitude = (P_ACC_WEIGHT*p_acc_magnitude) + (D_ACC_WEIGHT * derivative_acc)
+        self.acc = get_vector(self.theta + (self.angle * 180 / math.pi), self.acc_magnitude)
         return self.acc
 
     def update_state_vars(self, dist, dist2):
@@ -150,13 +153,12 @@ class Vehicle:
             self.acc /= self.acc.norm()
             self.acc *= self.acc_limit
         self.velocity += (self.acc * dt)
-        # self.velocity *= 2
+        self.speed = self.velocity.norm()
         if self.velocity.norm() > self.speed_limit:
             self.velocity /= self.velocity.norm()
             self.velocity *= self.speed_limit
         self.centroid += self.velocity * dt
         self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
-        # self.velocity = get_vector(math.atan2(self.velocity.get_y(), self.velocity.get_x()), 20)
 
     def get_xy_lists(self):
         p = self.state_to_corners()
