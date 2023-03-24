@@ -5,8 +5,8 @@ from point import ScaledPoint
 
 dt = 0.01
 ROAD_THRESHOLD = 25
-D_ACC_WEIGHT = 50
-P_ACC_WEIGHT = 0.5
+D_ACC_WEIGHT = 500
+P_ACC_WEIGHT = 15
 
 
 # utility functions

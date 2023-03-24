@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'white'
+NON_ROAD_COLOR = 'lightgrey'
 TRAIL_COLOR = 'grey'
 
 # Set the figure size and create the axis
@@ -201,7 +202,7 @@ def get_point_distance(point1, point2):
 #     return intersection_points
 
 
-def get_face_intersection_points(vehicle):
+def get_face_intersection_points(my_dcel, vehicle):
     intersection_points = []
 
     half_edges = my_dcel.hedges_map.get_all_hedges()
@@ -227,7 +228,7 @@ def get_face_intersection_points(vehicle):
     return intersection_points
 
 
-def get_closest_intersection_points(vehicle):
+def get_closest_intersection_points(my_dcel, vehicle):
     closest_point_1 = (0, 0)
     closest_point_2 = (0, 0)
     vehicle_x, vehicle_y = vehicle.get_car_mid_point()
@@ -235,7 +236,7 @@ def get_closest_intersection_points(vehicle):
     line_end = (vehicle.velocity.get_x() + vehicle_x, vehicle.velocity.get_y() + vehicle_y)
     min_distance_1 = 999999999
     min_distance_2 = 999999999
-    intersection_points = get_face_intersection_points(vehicle)
+    intersection_points = get_face_intersection_points(my_dcel, vehicle)
     for point in intersection_points:
         distance = sqrt((vehicle_x - point[0]) ** 2 + (vehicle_y - point[1]) ** 2)
         if point_lies_left(point, line_start, line_end):
@@ -248,8 +249,8 @@ def get_closest_intersection_points(vehicle):
     return [closest_point_1, closest_point_2]
 
 
-def get_error(vehicle):
-    intersection_points = get_closest_intersection_points(vehicle)
+def get_error(my_dcel, vehicle):
+    intersection_points = get_closest_intersection_points(my_dcel, vehicle)
     if len(intersection_points) < 2:
         return (0, 0), vehicle.error * 10
     mid_point_x, mid_point_y = get_mid_point([(intersection_points[0][0], intersection_points[0][1]),
@@ -278,6 +279,9 @@ def build_dcel_from_file():
 
 
 def compute_arrays(my_dcel, vehicle, frames):
+    print("Computation in progress...")
+    start = time.time()
+
     arrays = {
         'vehicle': [],
         'velocity': [],
@@ -300,9 +304,9 @@ def compute_arrays(my_dcel, vehicle, frames):
                 vehicle.current_face = vehicle.prev_face
             if vehicle.current_face is not None:
                 vehicle.prev_face = vehicle.current_face
-                intersection_points_list = get_closest_intersection_points(vehicle)
+                intersection_points_list = get_closest_intersection_points(my_dcel, vehicle)
                 vehicle.prev_error = vehicle.error
-                vehicle.face_mid_point, vehicle.error = get_error(vehicle)
+                vehicle.face_mid_point, vehicle.error = get_error(my_dcel, vehicle)
 
                 dist = 0
                 dist2 = 0
@@ -338,17 +342,28 @@ def compute_arrays(my_dcel, vehicle, frames):
                 arrays['intersection_points'].append(intersection_points_list)
             pbar.update(1)
 
+    end = time.time()
+    print(f"{int(end - start)} Seconds")
+
     return arrays
 
 
 def draw_roads(my_dcel, ax):
+    f = my_dcel.outer_face
+
+    x = [f.upper_left.x, f.upper_right.x, f.bottom_right.x, f.bottom_left.x]
+    y = [f.upper_left.y, f.upper_right.y, f.bottom_right.y, f.bottom_left.y]
+    ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=NON_ROAD_COLOR)
     for face in my_dcel.faces:
         vertices = face.get_face_vertices()
         x = [x for x, y in vertices]
         x.append(vertices[0][0])
         y = [y for x, y in vertices]
         y.append(vertices[0][1])
-        ax.plot(x, y, color=ROAD_EDGE_COLOR)
+        if face.name == 'f2':
+            ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=ROAD_COLOR)
+        else:
+            ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=NON_ROAD_COLOR)
 
 
 def plot(acc, speed):
@@ -359,18 +374,20 @@ def plot(acc, speed):
     ax.set_title(f"Acc Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
     ax.set_xlabel("frames")
     ax.set_ylabel("|acceleration|")
-    plt.show()
+    ax.set_ylim([-200, 200])
+    # plt.show()
+    fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}acc plot.png")
 
-    axis = plt.gca()
-    frames = np.linspace(0, len(speed), len(speed))
-    axis.set_aspect('equal', adjustable='box')
-    axis.plot(frames, speed)
-    axis.set_xlim([0, 500])
-    axis.set_ylim([-60, 60])
-    plt.title(f"Speed Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
-    plt.xlabel("frames")
-    plt.ylabel("speed")
-    plt.show()
+    # axis = plt.gca()
+    # frames = np.linspace(0, len(speed), len(speed))
+    # axis.set_aspect('equal', adjustable='box')
+    # axis.plot(frames, speed)
+    # axis.set_xlim([0, 500])
+    # axis.set_ylim([-60, 60])
+    # plt.title(f"Speed Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
+    # plt.xlabel("frames")
+    # plt.ylabel("speed")
+    # plt.show()
 
 
 def simulate(my_dcel, vehicle, frames, arrays, fn):
@@ -413,23 +430,28 @@ def simulate(my_dcel, vehicle, frames, arrays, fn):
     print(f"{int(end - start)} Seconds")
 
 
-my_dcel = build_dcel_from_file()
-# my_dcel.show_dcel()
-frames = 800
-print("Computation in progress...")
-start = time.time()
-arrays = compute_arrays(my_dcel, vehicle, frames)
-end = time.time()
-print(f"{int(end - start)} Seconds")
-with open("acc.txt", "w") as file:
-    for a in arrays['acc_magnitude']:
-        file.write(f"{a}\n")
-with open("speed.txt", "w") as file:
-    for s in arrays['speed']:
-        file.write(f"{s}\n")
-acc = np.loadtxt("acc.txt")
-speed = np.loadtxt("speed.txt")
-limit = 800
-plot(acc[:limit], speed[:limit])
-simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn="simulation.mp4")
+def write_to_file(arrays):
+    with open("acc.txt", "w") as file:
+        for a in arrays['acc_magnitude']:
+            file.write(f"{a}\n")
+    with open("speed.txt", "w") as file:
+        for s in arrays['speed']:
+            file.write(f"{s}\n")
 
+
+def run():
+    my_dcel = build_dcel_from_file()
+
+    frames = 4000
+    arrays = compute_arrays(my_dcel, vehicle, frames)
+
+    acc = np.loadtxt("acc.txt")
+    speed = np.loadtxt("speed.txt")
+
+    limit = 1000
+    plot(acc[:limit], speed[:limit])
+
+    simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
+
+
+run()
