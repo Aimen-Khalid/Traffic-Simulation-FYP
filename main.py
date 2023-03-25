@@ -202,10 +202,10 @@ def get_point_distance(point1, point2):
 #     return intersection_points
 
 
-def get_face_intersection_points(my_dcel, vehicle):
+def get_face_intersection_points(road_network, vehicle):
     intersection_points = []
 
-    half_edges = my_dcel.hedges_map.get_all_hedges()
+    half_edges = road_network.hedges_map.get_all_hedges()
     for half_edge in half_edges:
         segment1 = [(half_edge.origin.x, half_edge.origin.y), (half_edge.destination.x, half_edge.destination.y)]
         segment2 = vehicle.get_car_perpendicular_line()
@@ -228,7 +228,7 @@ def get_face_intersection_points(my_dcel, vehicle):
     return intersection_points
 
 
-def get_closest_intersection_points(my_dcel, vehicle):
+def get_closest_intersection_points(road_network, vehicle):
     closest_point_1 = (0, 0)
     closest_point_2 = (0, 0)
     vehicle_x, vehicle_y = vehicle.get_car_mid_point()
@@ -236,7 +236,7 @@ def get_closest_intersection_points(my_dcel, vehicle):
     line_end = (vehicle.velocity.get_x() + vehicle_x, vehicle.velocity.get_y() + vehicle_y)
     min_distance_1 = 999999999
     min_distance_2 = 999999999
-    intersection_points = get_face_intersection_points(my_dcel, vehicle)
+    intersection_points = get_face_intersection_points(road_network, vehicle)
     for point in intersection_points:
         distance = sqrt((vehicle_x - point[0]) ** 2 + (vehicle_y - point[1]) ** 2)
         if point_lies_left(point, line_start, line_end):
@@ -249,8 +249,8 @@ def get_closest_intersection_points(my_dcel, vehicle):
     return [closest_point_1, closest_point_2]
 
 
-def get_error(my_dcel, vehicle):
-    intersection_points = get_closest_intersection_points(my_dcel, vehicle)
+def get_error(road_network, vehicle):
+    intersection_points = get_closest_intersection_points(road_network, vehicle)
     if len(intersection_points) < 2:
         return (0, 0), vehicle.error * 10
     mid_point_x, mid_point_y = get_mid_point([(intersection_points[0][0], intersection_points[0][1]),
@@ -261,10 +261,6 @@ def get_error(my_dcel, vehicle):
     distance = get_point_distance((mid_point_x, mid_point_y), (vehicle_x, vehicle_y))
     if point_lies_left((mid_point_x, mid_point_y), segment[0], segment[1]):
         distance *= -1
-    # if distance < 1:
-    #     distance *= 1000
-    # else:
-    #     distance *= 10
 
     return (mid_point_x, mid_point_y), distance
 
@@ -272,13 +268,13 @@ def get_error(my_dcel, vehicle):
 def build_dcel_from_file():
     vertices = load_vertices_from_file()
     segments = load_segments_from_file()
-    my_dcel = dcel.Dcel()
-    my_dcel.build_dcel(vertices, segments)
-    # show_dcel(my_dcel)
-    return my_dcel
+    road_network = dcel.Dcel()
+    road_network.build_dcel(vertices, segments)
+    # show_dcel(road_network)
+    return road_network
 
 
-def compute_arrays(my_dcel, vehicle, frames):
+def compute_arrays(road_network, vehicle, frames):
     print("Computation in progress...")
     start = time.time()
 
@@ -299,14 +295,14 @@ def compute_arrays(my_dcel, vehicle, frames):
             vehicle_x, vehicle_y = vehicle.get_car_mid_point()
             arrays['trail_x'].append(vehicle_x)
             arrays['trail_y'].append(vehicle_y)
-            vehicle.current_face = my_dcel.get_face_for_point((vehicle_x, vehicle_y))
+            vehicle.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
             if vehicle.current_face is None:
                 vehicle.current_face = vehicle.prev_face
             if vehicle.current_face is not None:
                 vehicle.prev_face = vehicle.current_face
-                intersection_points_list = get_closest_intersection_points(my_dcel, vehicle)
+                intersection_points_list = get_closest_intersection_points(road_network, vehicle)
                 vehicle.prev_error = vehicle.error
-                vehicle.face_mid_point, vehicle.error = get_error(my_dcel, vehicle)
+                vehicle.face_mid_point, vehicle.error = get_error(road_network, vehicle)
 
                 dist = 0
                 dist2 = 0
@@ -337,6 +333,7 @@ def compute_arrays(my_dcel, vehicle, frames):
                 arrays['acc'].append((x, y))
                 arrays['acc_magnitude'].append(vehicle.acc_magnitude)
                 arrays['speed'].append(vehicle.speed)
+                arrays['error'].append(vehicle.error)
 
                 intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
                 arrays['intersection_points'].append(intersection_points_list)
@@ -348,13 +345,13 @@ def compute_arrays(my_dcel, vehicle, frames):
     return arrays
 
 
-def draw_roads(my_dcel, ax):
-    f = my_dcel.outer_face
+def draw_roads(road_network, ax):
+    f = road_network.outer_face
 
     x = [f.upper_left.x, f.upper_right.x, f.bottom_right.x, f.bottom_left.x]
     y = [f.upper_left.y, f.upper_right.y, f.bottom_right.y, f.bottom_left.y]
     ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=NON_ROAD_COLOR)
-    for face in my_dcel.faces:
+    for face in road_network.faces:
         vertices = face.get_face_vertices()
         x = [x for x, y in vertices]
         x.append(vertices[0][0])
@@ -366,36 +363,48 @@ def draw_roads(my_dcel, ax):
             ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=NON_ROAD_COLOR)
 
 
-def plot(acc, speed):
-    fig = plt.figure(figsize=(10, 6))
+def plot(acc, speed, error):
+    fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(8, 10))
     frames = np.linspace(0, len(acc), len(acc))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(frames, acc)
-    ax.set_title(f"Acc Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
-    ax.set_xlabel("frames")
-    ax.set_ylabel("|acceleration|")
-    ax.set_ylim([-200, 200])
-    # plt.show()
-    fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}acc plot.png")
 
-    # axis = plt.gca()
-    # frames = np.linspace(0, len(speed), len(speed))
-    # axis.set_aspect('equal', adjustable='box')
-    # axis.plot(frames, speed)
-    # axis.set_xlim([0, 500])
-    # axis.set_ylim([-60, 60])
-    # plt.title(f"Speed Plot: kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
-    # plt.xlabel("frames")
-    # plt.ylabel("speed")
-    # plt.show()
+    ax1.plot(frames, acc)
+
+    ax1.axhline(y=vehicle.acc_limit, color='blue', label="acc limit")
+    ax1.axhline(y=-1*vehicle.acc_limit, color='blue')
+    max_acc = np.max(acc[10:])
+    min_acc = np.min(acc[10:])
+    # ax1.legend([f"acc limit ({vehicle.acc_limit})", f"max acc ({max_acc:.2f})", f"min acc ({min_acc:.2f})"])
+    ax1.text(0.95, 0.95, f"max acc={max_acc:.2f}\nmin acc={min_acc:.2f}", transform=ax1.transAxes, ha='right', va='top',
+             bbox=dict(facecolor='white', edgecolor='none', alpha=0.5))
+
+    ax1.legend(loc='upper left')
+    ax1.set_ylabel('Acceleration')
+    # ax1.set_ylim([-250, 250])
+
+    ax2.plot(frames, error)
+    ax2.set_ylabel('Error')
+    ax2.set_ylim([-20, 20])
+
+    ax3.plot(frames, speed)
+    ax3.set_ylabel('Speed')
+    ax3.set_xlabel('Frames')
+
+    fig.suptitle(f"kp={car.P_ACC_WEIGHT} kd={car.D_ACC_WEIGHT}")
+
+    # Adjust the spacing between subplots
+    fig.tight_layout()
+
+    plt.show()
+
+    fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT} plot.png")
 
 
-def simulate(my_dcel, vehicle, frames, arrays, fn):
+def simulate(road_network, vehicle, frames, arrays, fn):
     fig = plt.figure()
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
 
-    draw_roads(my_dcel, ax)
+    draw_roads(road_network, ax)
 
     vehicle_line, = ax.plot([], [])
     trail_line, = ax.plot([], [], color=TRAIL_COLOR)
@@ -437,21 +446,27 @@ def write_to_file(arrays):
     with open("speed.txt", "w") as file:
         for s in arrays['speed']:
             file.write(f"{s}\n")
+    with open("error.txt", "w") as file:
+        for e in arrays['error']:
+            file.write(f"{e}\n")
 
 
 def run():
-    my_dcel = build_dcel_from_file()
-
-    frames = 4000
-    arrays = compute_arrays(my_dcel, vehicle, frames)
+    # road_network = build_dcel_from_file()
+    #
+    # frames = 4000
+    #
+    # arrays = compute_arrays(road_network, vehicle, frames)
+    # write_to_file(arrays)
 
     acc = np.loadtxt("acc.txt")
     speed = np.loadtxt("speed.txt")
+    error = np.loadtxt("error.txt")
 
-    limit = 1000
-    plot(acc[:limit], speed[:limit])
+    limit = 4000
+    plot(acc[3:limit], speed[3:limit], error[3:limit])
 
-    simulate(my_dcel, vehicle, frames=frames, arrays=arrays, fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
+    # simulate(road_network, vehicle, frames=frames, arrays=arrays, fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
 
 
 run()

@@ -5,8 +5,8 @@ from point import ScaledPoint
 
 dt = 0.01
 ROAD_THRESHOLD = 25
-D_ACC_WEIGHT = 500
-P_ACC_WEIGHT = 15
+D_ACC_WEIGHT = 10
+P_ACC_WEIGHT = 10
 
 
 # utility functions
@@ -63,7 +63,7 @@ class Vehicle:
         self.length = length
         self.width = width
         self.speed_limit = 80
-        self.acc_limit = 40
+        self.acc_limit = 50
         # state variables
         self.centroid = centroid
         self.angle = angle
