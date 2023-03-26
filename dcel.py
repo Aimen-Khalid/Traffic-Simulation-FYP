@@ -3,8 +3,8 @@ from shapely.geometry import Polygon, Point
 import random
 import matplotlib.pyplot as plt
 
-CLOCKWISE = 0  # outside
-ANTICLOCKWISE = 1  # inside
+CLOCKWISE = 0  # outside edges
+ANTICLOCKWISE = 1  # inside edges
 
 
 class Face:
