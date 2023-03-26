@@ -25,7 +25,7 @@ ax.xaxis.set_ticks(range(0, 900, 30))
 ax.yaxis.set_ticks(range(0, 700, 30))
 ax.grid(color='green', linestyle='-', linewidth=0.5)
 
-vehicle = car.Vehicle(length=20, width=10, speed_limit=0, acc_limit=0, centroid=ScaledPoint(420, 50),
+vehicle = car.Vehicle(length=20, width=10, speed_limit=0, acc_limit=0, centroid=ScaledPoint(420, 50),  # 420, 50
                       angle=5, v=ScaledPoint(50, 5), a=ScaledPoint(0, 0))
 
 
@@ -39,7 +39,7 @@ def get_vertices_list(vertices):
 
 
 def write_vertices_to_file(vertices):
-    with open("vertices1.txt", "w") as file:
+    with open("vertices.txt", "w") as file:
         for vertex in vertices:
             for coordinate in vertex:
                 file.write(str(coordinate) + "\t")
@@ -48,7 +48,7 @@ def write_vertices_to_file(vertices):
 
 def load_vertices_from_file():
     vertices = []
-    with open("vertices1.txt", "r") as file:
+    with open("vertices.txt", "r") as file:
         for line in file:
             vertex = tuple(int(x) for x in line.strip().split("\t"))
             vertices.append(vertex)
@@ -56,7 +56,7 @@ def load_vertices_from_file():
 
 
 def write_segments_to_file(segments):
-    with open("segments1.txt", "w") as file:
+    with open("segments.txt", "w") as file:
         for segment in segments:
             for vertices in segment:
                 for vertex in vertices:
@@ -66,7 +66,7 @@ def write_segments_to_file(segments):
 
 def load_segments_from_file():
     segments = []
-    with open("segments1.txt", "r") as file:
+    with open("segments.txt", "r") as file:
         for line in file:
             vertices = [int(x) for x in line.strip().split("\t")]
             segment = [(vertices[0], vertices[1]), (vertices[2], vertices[3])]
@@ -228,7 +228,7 @@ def get_point_distance(point1, point2):
 def get_face_intersection_points(road_network, vehicle):
     intersection_points = []
 
-    half_edges = road_network.hedges_map.get_all_hedges()
+    half_edges = vehicle.current_face.get_face_hedges()
     for half_edge in half_edges:
         segment1 = [(half_edge.origin.x, half_edge.origin.y), (half_edge.destination.x, half_edge.destination.y)]
         segment2 = vehicle.get_car_perpendicular_line()
@@ -475,13 +475,12 @@ def write_to_file(arrays):
 
 
 def run():
-    # main()
     road_network = build_dcel_from_file()
     # road_network.show_dcel()
     frames = 4000
     #
-    # arrays = compute_arrays(road_network, vehicle, frames)
-    # write_to_file(arrays)
+    arrays = compute_arrays(road_network, vehicle, frames)
+    write_to_file(arrays)
 
     # acc = np.loadtxt("acc.txt")
     # speed = np.loadtxt("speed.txt")
@@ -490,7 +489,7 @@ def run():
     # limit = 4000
     # plot(acc[3:limit], speed[3:limit], error[3:limit])
 
-    # simulate(road_network, vehicle, frames=frames, arrays=arrays, fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
+    simulate(road_network, vehicle, frames=frames, arrays=arrays, fn="simulation.mp4")  #fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
 
 
 run()

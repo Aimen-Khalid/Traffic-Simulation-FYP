@@ -16,7 +16,7 @@ class Face:
         self.faces_inside = []
         self.parent = None
 
-    def get_face_vertices(self):
+    def get_face_vertices(self):  # returns vertices of outer boundary of face
         hedge = self.outer_component
         face_vertices = [[hedge.origin.x, hedge.origin.y]]
         hedge = hedge.next
@@ -24,6 +24,23 @@ class Face:
             face_vertices.append((hedge.origin.x, hedge.origin.y))
             hedge = hedge.next
         return face_vertices
+
+    def get_face_hedges(self):  # returns hedges of outer boundary of face along with hedges of inside faces
+        hedges = []
+        h = self.outer_component.twin
+        while h.next != self.outer_component.twin:
+            hedges.append(h)
+            h = h.next
+        hedges.append(h)
+
+        for inside_face in h.incident_face.faces_inside:
+            h1 = inside_face.outer_component.twin
+            while h1.next != inside_face.outer_component.twin:
+                hedges.append(h1)
+                h1 = h1.next
+            hedges.append(h1)
+
+        return hedges
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
