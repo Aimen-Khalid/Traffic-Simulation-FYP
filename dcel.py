@@ -3,6 +3,9 @@ from shapely.geometry import Polygon, Point
 import random
 import matplotlib.pyplot as plt
 
+CLOCKWISE = 0  # outside
+ANTICLOCKWISE = 1  # inside
+
 
 class Face:
     def __init__(self):
@@ -10,7 +13,8 @@ class Face:
         self.outer_component = None  # One half edge of the outer-cycle
         self.fill_color = (random.random(), random.random(), random.random())
         self.polygon = None
-        self.inner_components = []
+        self.faces_inside = []
+        self.parent = None
 
     def get_face_vertices(self):
         hedge = self.outer_component
@@ -36,6 +40,8 @@ class HalfEdge:
         self.twin = None
         self.next = None
         self.prev = None
+        self.direction = None
+        self.visited = False
 
     def __repr__(self):
         return f"E(o:[{self.origin.x}, {self.origin.y}], d:[{self.destination.x}, {self.destination.y}])"
@@ -212,7 +218,8 @@ class Dcel:
         self.__add_face_pointers()
         self.__create_outer_face(points)
         self.__set_polygons()
-        self.__set_faces_inner_components()
+        self.__set_hedges_direction()
+        self.__set_faces_inside_faces()
 
     def __set_polygons(self):
         for face in self.faces:
@@ -281,14 +288,12 @@ class Dcel:
         bounding_box_upper_right = Vertex(max_x + 1, max_y + 1, "rr")
         bounding_box_lower_right = Vertex(max_x + 1, min_y - 1, "lr")
 
-        outer_face_vertices = []
-        outer_face_edges = []
-
-        outer_face_vertices.append(bounding_box_upper_left)
-        outer_face_vertices.append(bounding_box_lower_left)
-        outer_face_vertices.append(bounding_box_upper_right)
-        outer_face_vertices.append(bounding_box_lower_right)
-
+        outer_face_vertices = [
+            bounding_box_upper_left,
+            bounding_box_lower_left,
+            bounding_box_upper_right,
+            bounding_box_lower_right,
+        ]
         self.outer_face.set_vertices(outer_face_vertices)
 
         hedge = HalfEdge(bounding_box_upper_left, bounding_box_upper_right)
@@ -296,8 +301,7 @@ class Dcel:
         twin_hedge.incident_face = self.outer_face
         hedge.twin = twin_hedge
         twin_hedge.twin = hedge
-        outer_face_edges.append(Edge(hedge, twin_hedge))
-
+        outer_face_edges = [Edge(hedge, twin_hedge)]
         hedge = HalfEdge(bounding_box_upper_right, bounding_box_lower_right)
         twin_hedge = HalfEdge(bounding_box_lower_right, bounding_box_upper_right)
         hedge.twin = twin_hedge
@@ -338,23 +342,25 @@ class Dcel:
         max_face = None
         max_face_area = 0
         for hedge in self.hedges_map.get_all_hedges():
-            if hedge.incident_face is None:  # If this half edge has no incident face yet
+            if hedge.incident_face is None and hedge.twin.incident_face is None:
                 vertex_list = [(hedge.origin.x, hedge.origin.y)]  # For calculating face size later
 
                 number_of_faces += 1
 
                 f = Face()
-                f.name = "f" + str(number_of_faces)
+                f.name = f"f{number_of_faces}"
 
                 f.outer_component = hedge
                 hedge.incident_face = f
 
                 h = hedge
-                while not h.next == hedge:  # Walk through all hedges of the cycle and set incident face
+                while h.next != hedge:  # Walk through all hedges of the cycle and set incident face
                     h.incident_face = f
+                    h.twin.incident_face = f
                     h = h.next
                     vertex_list.append((h.origin.x, h.origin.y))
                 h.incident_face = f
+                h.twin.incident_face = f
 
                 self.faces.append(f)
 
@@ -366,22 +372,65 @@ class Dcel:
 
         # The max face is actually the inner cycle of the outer face under assumption that faces
         # do not contain holes or are separated
-        self.faces.remove(max_face)
-        h = max_face.outer_component
-        h.incident_face = self.outer_face
-        self.outer_face.inner_component = h
-        while not h.next == max_face.outer_component:
-            h = h.next
-            h.incident_face = self.outer_face
+        # self.faces.remove(max_face)
+        # h = max_face.outer_component
+        # h.incident_face = self.outer_face
+        # self.outer_face.inner_component = h
+        # while h.next != max_face.outer_component:
+        #     h = h.next
+        #     h.incident_face = self.outer_face
 
-    def __set_faces_inner_components(self):
+    def __set_hedges_direction(self):
+        for hedge in self.hedges_map.get_all_hedges():
+            if hedge.direction is None:
+                edges_sum = 0
+                h = hedge
+                while h.next != hedge:  # Walk through all hedges of the cycle and find edges sum
+                    edges_sum += (h.next.origin.x - h.origin.x) * (h.next.origin.y + h.origin.y)  # (x2 − x1)(y2 + y1)
+                    h = h.next
+                edges_sum += (h.next.origin.x - h.origin.x) * (h.next.origin.y + h.origin.y)
+                direction = CLOCKWISE if edges_sum > 0 else ANTICLOCKWISE
+
+                h = hedge
+                while h.next != hedge:
+                    h.direction = direction
+                    h = h.next
+
+    def __set_faces_inside_faces(self):
         for i, face1 in enumerate(self.faces):
             for j in range(i + 1, len(self.faces)):
                 face2 = self.faces[j]
-
                 # Check if face1 is contained within face2 or vice versa
                 if face1.polygon.within(face2.polygon) and face1 != face2:
-                    face2.inner_components.append(face1)
+                    face2.faces_inside.append(face1)
                 elif face2.polygon.within(face1.polygon) and face1 != face2:
-                    face1.inner_components.append(face2)
+                    face1.faces_inside.append(face2)
 
+        # Loop over each face
+        for i in range(len(self.faces)):
+            # Sort the inside faces of this face in descending order by area
+            self.faces[i].faces_inside.sort(key=lambda f: f.polygon.area, reverse=True)
+
+            # Loop over each inside face
+            for inside_face in self.faces[i].faces_inside:
+                inside_face.parent = self.faces[i]
+                for nested_inside_face in inside_face.faces_inside:
+                    nested_inside_face.parent = inside_face
+                    self.faces[i].faces_inside.remove(nested_inside_face)
+
+        for hedge in self.hedges_map.get_all_hedges():
+            if not hedge.visited:
+                h = hedge
+                h.visited = True
+                while h.direction == CLOCKWISE and h.next != hedge:  # Walk through all hedges of the cycle and set incident face
+                    if h.incident_face is not None:
+                        if h.incident_face.parent is None:
+                            h.incident_face.parent = self.outer_face
+                        # h.incident_face.parent.outer_component = h
+                        h.incident_face = h.incident_face.parent
+                    h = h.next
+                    h.visited = True
+                if h.direction == CLOCKWISE:
+                    h.incident_face = h.incident_face.parent
+
+            # hedge.incident_face.outer_component = hedge

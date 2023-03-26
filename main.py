@@ -39,7 +39,7 @@ def get_vertices_list(vertices):
 
 
 def write_vertices_to_file(vertices):
-    with open("vertices.txt", "w") as file:
+    with open("vertices1.txt", "w") as file:
         for vertex in vertices:
             for coordinate in vertex:
                 file.write(str(coordinate) + "\t")
@@ -48,7 +48,7 @@ def write_vertices_to_file(vertices):
 
 def load_vertices_from_file():
     vertices = []
-    with open("vertices.txt", "r") as file:
+    with open("vertices1.txt", "r") as file:
         for line in file:
             vertex = tuple(int(x) for x in line.strip().split("\t"))
             vertices.append(vertex)
@@ -56,7 +56,7 @@ def load_vertices_from_file():
 
 
 def write_segments_to_file(segments):
-    with open("segments.txt", "w") as file:
+    with open("segments1.txt", "w") as file:
         for segment in segments:
             for vertices in segment:
                 for vertex in vertices:
@@ -66,7 +66,7 @@ def write_segments_to_file(segments):
 
 def load_segments_from_file():
     segments = []
-    with open("segments.txt", "r") as file:
+    with open("segments1.txt", "r") as file:
         for line in file:
             vertices = [int(x) for x in line.strip().split("\t")]
             segment = [(vertices[0], vertices[1]), (vertices[2], vertices[3])]
@@ -107,6 +107,29 @@ def get_vertices_and_segments():
 
 def main():
     vertices, segments = get_vertices_and_segments()
+
+    # # finding vertices for outer face
+    # min_x = vertices[0][0]
+    # max_x = vertices[0][0]
+    # min_y = vertices[0][1]
+    # max_y = vertices[0][1]
+    # for vertex in vertices:
+    #     if vertex[0] < min_x: min_x = vertex[0]
+    #     if vertex[0] > max_x: max_x = vertex[0]
+    #     if vertex[1] < min_y: min_y = vertex[1]
+    #     if vertex[1] > max_y: max_y = vertex[1]
+    #
+    # # adding vertices and segments for outer face
+    # vertices.append((min_x - 1, max_y + 1))
+    # vertices.append((min_x - 1, min_y - 1))
+    # vertices.append((max_x + 1, max_y + 1))
+    # vertices.append((max_x + 1, min_y - 1))
+    #
+    # segments.append([(min_x - 1, max_y + 1), (min_x - 1, min_y - 1)])
+    # segments.append([(min_x - 1, min_y - 1), (max_x + 1, min_y - 1)])
+    # segments.append([(max_x + 1, min_y - 1), (max_x + 1, max_y + 1)])
+    # segments.append([(max_x + 1, max_y + 1), (min_x - 1, max_y + 1)])
+
     dcel_obj = dcel.Dcel()
     dcel_obj.build_dcel(vertices, segments)
     dcel_obj.show_dcel()
@@ -452,19 +475,20 @@ def write_to_file(arrays):
 
 
 def run():
-    # road_network = build_dcel_from_file()
-    #
-    # frames = 4000
+    # main()
+    road_network = build_dcel_from_file()
+    # road_network.show_dcel()
+    frames = 4000
     #
     # arrays = compute_arrays(road_network, vehicle, frames)
     # write_to_file(arrays)
 
-    acc = np.loadtxt("acc.txt")
-    speed = np.loadtxt("speed.txt")
-    error = np.loadtxt("error.txt")
-
-    limit = 4000
-    plot(acc[3:limit], speed[3:limit], error[3:limit])
+    # acc = np.loadtxt("acc.txt")
+    # speed = np.loadtxt("speed.txt")
+    # error = np.loadtxt("error.txt")
+    #
+    # limit = 4000
+    # plot(acc[3:limit], speed[3:limit], error[3:limit])
 
     # simulate(road_network, vehicle, frames=frames, arrays=arrays, fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
 
