@@ -9,6 +9,7 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 import time
 from tqdm import tqdm
+import winsound
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'white'
@@ -210,20 +211,22 @@ def get_closest_intersection_points(vehicle):
     return [closest_point_1, closest_point_2]
 
 
-def get_error(vehicle):
-    mid_point_x, mid_point_y = vehicle.face_mid_point
+def get_error(vehicle, intersection_points):
+    face_mid_point_x, face_mid_point_y = vehicle.face_mid_point
 
     segment = vehicle.get_car_perpendicular_line()
 
     vehicle_x = (segment[0][0] + segment[1][0]) / 2
     vehicle_y = (segment[0][1] + segment[1][1]) / 2
 
-    distance = get_euclidean_distance((mid_point_x, mid_point_y), (vehicle_x, vehicle_y))
+    # distance = get_euclidean_distance((face_mid_point_x, face_mid_point_y), (vehicle_x, vehicle_y))
+    a = get_euclidean_distance((intersection_points[0][0], intersection_points[0][1]), (vehicle_x, vehicle_y))
+    b = get_euclidean_distance((intersection_points[1][0], intersection_points[1][1]), (vehicle_x, vehicle_y))
 
-    if point_lies_left((mid_point_x, mid_point_y), segment[0], segment[1]):
-        distance *= -1
+    # if point_lies_left((face_mid_point_x, face_mid_point_y), segment[0], segment[1]):
+    #     distance *= -1
 
-    return distance
+    return (b - a) / 2
 
 
 def build_dcel_from_file():
@@ -271,7 +274,7 @@ def compute_parameters(road_network, vehicle, frames):
                                                         (intersection_points_list[1][0], intersection_points_list[1][1])])
 
                 vehicle.prev_error = vehicle.error
-                vehicle.error = get_error(vehicle)
+                vehicle.error = get_error(vehicle, intersection_points_list)
 
                 dist = 0
                 dist2 = 0
@@ -286,9 +289,10 @@ def compute_parameters(road_network, vehicle, frames):
 
                 text = (f'acc: {str(vehicle.acc.norm())}'
                                 + '\ntheta: ' + str(vehicle.theta)
-                                + '\nVelocity: ' + str(vehicle.velocity.norm())
-                                + '\nDist: ' + str(dist)
-                                + '\nDist2: ' + str(dist2))
+                                # + '\nVelocity: ' + str(vehicle.velocity.norm())
+                                + '\nerror: ' + str(vehicle.error)
+                                # + '\nframe: ' + str(_)
+                        )
                 parameters['text'].append(text)
 
                 x, y = vehicle.get_xy_lists()
@@ -356,11 +360,12 @@ def plot_parameters(start, end):
 
     ax1.legend(loc='upper left')
     ax1.set_ylabel('Acceleration')
-    # ax1.set_ylim([-250, 250])
+    # ax1.set_xlim([400, 450])
 
     ax2.plot(frames, error)
     ax2.set_ylabel('Error')
     ax2.set_ylim([-20, 20])
+    # ax2.set_xlim([400, 450])
 
     ax3.plot(frames, speed)
     ax3.set_ylabel('Speed')
@@ -371,7 +376,7 @@ def plot_parameters(start, end):
     # Adjust the spacing between subplots
     fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT} plot.png")
 
@@ -436,9 +441,15 @@ def run():
     write_to_file(parameters)
 
     # simulation will start after closing the plot figure
-    plot_parameters(start=5, end=1000)
+    plot_parameters(start=5, end=4000)
 
-    simulate(road_network, vehicle, frames=frames, parameters=parameters, file_name="simulation.mp4")  #fn=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
+    simulate(road_network, vehicle, frames=frames, parameters=parameters,
+            file_name=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
 
 
 run()
+
+frequency = 2500  # Set frequency to 2500 Hertz
+duration = 1000  # Set duration to 1000 ms = 1 second
+winsound.Beep(frequency, duration)
+
