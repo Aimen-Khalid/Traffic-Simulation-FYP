@@ -276,16 +276,7 @@ def compute_parameters(road_network, vehicle, frames):
                 vehicle.prev_error = vehicle.error
                 vehicle.error = get_error(vehicle, intersection_points_list)
 
-                dist = 0
-                dist2 = 0
-
-                if len(intersection_points_list) > 2:
-                    dist = math.sqrt((vehicle_x - intersection_points_list[0][0])**2 +
-                                    (vehicle_y - intersection_points_list[0][1])**2)
-                    dist2 = math.sqrt((vehicle_x - intersection_points_list[1][0])**2 +
-                                    (vehicle_y - intersection_points_list[1][1])**2)
-
-                vehicle.update_state_vars(dist, dist2)
+                vehicle.update_state_vars()
 
                 text = (f'acc: {str(vehicle.acc.norm())}'
                                 + '\ntheta: ' + str(vehicle.theta)

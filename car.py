@@ -1,17 +1,20 @@
+# imports
 import math
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
 from point import ScaledPoint
 
+
+# constants
 dt = 0.01
-ROAD_THRESHOLD = 25
-D_ACC_WEIGHT = 100
-P_ACC_WEIGHT = 10
+D_ACC_WEIGHT = 50
+P_ACC_WEIGHT = 5
 
 
-# utility functions
-# returns a unit vector perpendicular to the input vector V
-def get_orthogonal_unit_vector(vector):   # V is an instance of point class
+# --------------------------------- utility functions -------------------------------- #
+
+# returns a unit vector perpendicular to the input vector
+def get_orthogonal_unit_vector(vector):   # vector is an instance of scaled point class
     if vector.get_y() == 0:
         return ScaledPoint(0, 1)
     v1 = 5
@@ -64,6 +67,7 @@ class Vehicle:
         self.width = width
         self.speed_limit = 80
         self.acc_limit = 45
+        self.theta = -90
         # state variables
         self.centroid = centroid
         self.angle = angle
@@ -119,36 +123,19 @@ class Vehicle:
                     v2 = j
         return v1, v2
 
-    def controller(self, dist, dist2):
-        self.theta = 45
+    def controller(self):
         if self.face_mid_point is None:
             return self.acc
-        vehicle_x, vehicle_y = self.get_car_mid_point()
-        line_start = (vehicle_x, vehicle_y)
-        line_end = (self.velocity.get_x() + vehicle_x, self.velocity.get_y() + vehicle_y)
-        if point_lies_left(self.face_mid_point, line_start, line_end):
-            self.theta = abs(self.theta)
-        else:
-            self.theta = -1*abs(self.theta)
-
-        if dist < ROAD_THRESHOLD or dist2 < ROAD_THRESHOLD:
-            theta_weight = 1.5
-            theta_weight *= self.error
-            self.theta *= theta_weight
-            if self.theta > 90:
-                self.theta = 90
-            elif self.theta < -90:
-                self.theta = -90
 
         p_acc_magnitude = self.error
-        derivative_acc = self.error - self.prev_error
+        d_acc_magnitude = self.error - self.prev_error
         self.integral_acc = self.integral_acc + p_acc_magnitude
-        self.acc_magnitude = (P_ACC_WEIGHT*p_acc_magnitude) + (D_ACC_WEIGHT * derivative_acc)
+        self.acc_magnitude = (P_ACC_WEIGHT*p_acc_magnitude) + (D_ACC_WEIGHT * d_acc_magnitude)
         self.acc = get_vector(self.theta + (self.angle * 180 / math.pi), self.acc_magnitude)
         return self.acc
 
-    def update_state_vars(self, dist, dist2):
-        self.controller(dist, dist2)
+    def update_state_vars(self):
+        self.controller()
         if self.acc.norm() > self.acc_limit:
             self.acc /= self.acc.norm()
             self.acc *= self.acc_limit
