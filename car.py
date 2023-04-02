@@ -3,12 +3,12 @@ import math
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
 from point import ScaledPoint
-
+from shapely import Point, LineString
 
 # constants
 dt = 0.01
 D_ACC_WEIGHT = 50
-P_ACC_WEIGHT = 5
+P_ACC_WEIGHT = 10
 
 
 # --------------------------------- utility functions -------------------------------- #
@@ -17,84 +17,66 @@ P_ACC_WEIGHT = 5
 def get_orthogonal_unit_vector(vector):   # vector is an instance of scaled point class
     if vector.get_y() == 0:
         return ScaledPoint(0, 1)
-    v1 = 5
-    # using the fact that dot product of perpendicular vectors is 0
-    v2 = -vector.get_x() / vector.get_y() * v1
-    magnitude = math.sqrt(v1**2+v2**2)
-    v2 /= magnitude
-    v1 /= magnitude
-    return ScaledPoint(v1, v2)
+    # choose an arbitrary value for one of the coordinates of the orthogonal vector
+    x1 = 5
+    # using the fact that dot product of perpendicular vectors is 0 ie x1*x2 + y1*y2 = 0
+    y1 = -vector.get_x() / vector.get_y() * x1
+    magnitude = math.sqrt(x1**2+y1**2)
+    # normalizing the vector
+    y1 /= magnitude
+    x1 /= magnitude
+    return ScaledPoint(x1, y1)
 
 
-def print_points(points):
-    for x in points:
-        x.print()
-
-
-def get_vector(direction, magnitude):
-    angle = radians(direction)  # angle the velocity vector makes with x-axis
-    vector_direction = ScaledPoint(cos(angle), sin(angle))  # unit vector in the direction of velocity
+def get_vector(angle, magnitude):
+    angle = radians(angle)
+    vector_direction = ScaledPoint(cos(angle), sin(angle))  # unit vector with the given angle
     return vector_direction * magnitude
 
-
-def get_avg_centroid(vehicles):
-    avg_centroid = ScaledPoint(0, 0)
-    for v_ in vehicles:
-        avg_centroid += v_.centroid
-    return avg_centroid/len(vehicles)
-
-
-def point_above_line(point, line_start, line_end):
-    return point[1] > line_start[1]
-
-
-def point_lies_left(point, line_start, line_end):
-    dx = line_end[0] - line_start[0]
-    dy = line_end[1] - line_start[1]
-    dx1 = point[0] - line_start[0]
-    dy1 = point[1] - line_start[1]
-    cross_product = dx * dy1 - dy * dx1
-    return cross_product > 0 or cross_product >= 0
+# ------------------------------------------------------------------------------------------------
 
 
 class Vehicle:
-    theta = 45
 
-    def __init__(self, length, width, speed_limit, acc_limit, centroid, angle, v, a, error=ScaledPoint(0, 0),
-                 current_face=None):
+    def __init__(self, length, width, centroid, angle, velocity, acceleration):
+
         # parameters
         self.length = length
         self.width = width
         self.speed_limit = 80
         self.acc_limit = 45
         self.theta = -90
+        self.reference_track = LineString([(300, 55), (635, 55), (770, 220), (770, 500), (620, 620), (300, 620),
+                                           (135, 500), (135, 230), (300, 55)])
+
         # state variables
         self.centroid = centroid
         self.angle = angle
-        self.velocity = v
-        self.speed = 0
-        self.acc = a
+        self.velocity = velocity
+        self.acc = acceleration
         self.integral_acc = 0
         self.acc_magnitude = 0
-        self.max_force = 0.5
-        self.error_point = error
         self.error = 0
         self.prev_error = 0
-        self.current_face = current_face
+        self.current_face = None
         self.prev_face = None
         self.face_mid_point = None
 
     # uses centroid and angle of vehicle to return its 4 points
     def state_to_corners(self):
+        # dir_vector starts from vehicle centroid and ends at the mid-point of the front line of vehicle
         dir_vect = ScaledPoint(cos(self.angle), sin(self.angle))
         dir_vect = dir_vect * (self.length / 2)
-        orthogonal_vect = get_orthogonal_unit_vector(dir_vect)
-        orthogonal_vect = ScaledPoint(orthogonal_vect.get_x() * self.width / 2, orthogonal_vect.get_y() * self.width / 2)
+
+        # orthogonal_vector starts from vehicle centroid and ends at the mid-point of the side line of vehicle
+        orthogonal_vector = get_orthogonal_unit_vector(dir_vect)
+        orthogonal_vector = ScaledPoint(orthogonal_vector.get_x() * self.width / 2, orthogonal_vector.get_y() * self.width / 2)
+
         return [
-            self.centroid + dir_vect + orthogonal_vect,
-            self.centroid + dir_vect - orthogonal_vect,
-            self.centroid - dir_vect - orthogonal_vect,
-            self.centroid - dir_vect + orthogonal_vect,
+            self.centroid + dir_vect + orthogonal_vector,
+            self.centroid + dir_vect - orthogonal_vector,
+            self.centroid - dir_vect - orthogonal_vector,
+            self.centroid - dir_vect + orthogonal_vector,
         ]
 
     def shortest_distance(self, vector):
@@ -124,8 +106,8 @@ class Vehicle:
         return v1, v2
 
     def controller(self):
-        if self.face_mid_point is None:
-            return self.acc
+        # if self.face_mid_point is None:
+        #     return self.acc
 
         p_acc_magnitude = self.error
         d_acc_magnitude = self.error - self.prev_error
@@ -140,7 +122,7 @@ class Vehicle:
             self.acc /= self.acc.norm()
             self.acc *= self.acc_limit
         self.velocity += (self.acc * dt)
-        self.speed = self.velocity.norm()
+        # self.speed = self.velocity.norm()
         if self.velocity.norm() > self.speed_limit:
             self.velocity /= self.velocity.norm()
             self.velocity *= self.speed_limit

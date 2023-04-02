@@ -4,20 +4,22 @@ import dcel
 import car
 from point import ScaledPoint
 import matplotlib.pyplot as plt
-from car import point_lies_left
 from matplotlib.animation import FuncAnimation
 import numpy as np
 import time
 from tqdm import tqdm
 import winsound
+from shapely import Point, LineString
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'white'
 NON_ROAD_COLOR = 'lightgrey'
 TRAIL_COLOR = 'grey'
 
-vehicle = car.Vehicle(length=20, width=10, speed_limit=0, acc_limit=0, centroid=ScaledPoint(420, 50),
-                      angle=5, v=ScaledPoint(50, 5), a=ScaledPoint(0, 0))
+vehicle = car.Vehicle(length=20, width=10, centroid=ScaledPoint(420, 50),
+                      angle=5, velocity=ScaledPoint(70, 5), acceleration=ScaledPoint(0, 0))
+# (50, 5), -90
+initial_speed = vehicle.velocity.norm()
 
 
 def write_vertices_to_file(vertices):
@@ -54,6 +56,15 @@ def load_segments_from_file():
             segment = [(vertices[0], vertices[1]), (vertices[2], vertices[3])]
             segments.append(segment)
     return segments
+
+
+def point_lies_left(point, line_start, line_end):
+    dx = line_end[0] - line_start[0]
+    dy = line_end[1] - line_start[1]
+    dx1 = point[0] - line_start[0]
+    dy1 = point[1] - line_start[1]
+    cross_product = dx * dy1 - dy * dx1
+    return cross_product > 0 or cross_product >= 0
 
 
 def get_vertices_and_segments():
@@ -219,14 +230,43 @@ def get_error(vehicle, intersection_points):
     vehicle_x = (segment[0][0] + segment[1][0]) / 2
     vehicle_y = (segment[0][1] + segment[1][1]) / 2
 
-    # distance = get_euclidean_distance((face_mid_point_x, face_mid_point_y), (vehicle_x, vehicle_y))
     a = get_euclidean_distance((intersection_points[0][0], intersection_points[0][1]), (vehicle_x, vehicle_y))
     b = get_euclidean_distance((intersection_points[1][0], intersection_points[1][1]), (vehicle_x, vehicle_y))
 
-    # if point_lies_left((face_mid_point_x, face_mid_point_y), segment[0], segment[1]):
-    #     distance *= -1
-
     return (b - a) / 2
+
+
+def get_vehicle_front_point(vehicle):
+    segment = vehicle.get_car_perpendicular_line()
+    return Point((segment[0][0] + segment[1][0]) / 2, (segment[0][1] + segment[1][1]) / 2)
+
+
+def get_projected_point(vehicle):
+    vehicle_point = get_vehicle_front_point(vehicle)
+    projected_point_distance = vehicle.reference_track.project(vehicle_point)
+    return vehicle.reference_track.interpolate(projected_point_distance)
+
+
+def get_track_segment(vehicle):
+    projected_point = get_projected_point(vehicle)
+    coords = vehicle.reference_track.coords
+    for i in range(len(coords) - 1):
+        if LineString([coords[i], coords[i + 1]]).distance(projected_point) < 1:
+            return Point(coords[i][0], coords[i][1]), Point(coords[i + 1][0], coords[i + 1][1])
+
+
+def get_error_from_track(vehicle):
+    vehicle_point = get_vehicle_front_point(vehicle)
+    segment_point_1, segment_point_2 = get_track_segment(vehicle)
+
+    # translating the points to origin
+    error = vehicle_point.distance(vehicle.reference_track)
+    vehicle_point = Point(vehicle_point.x - segment_point_1.x, vehicle_point.y - segment_point_1.y)
+    segment_point_2 = Point(segment_point_2.x - segment_point_1.x, segment_point_2.y - segment_point_1.y)
+
+    cross_product = segment_point_2.x * vehicle_point.y - segment_point_2.y * vehicle_point.x
+
+    return error * (1 if cross_product > 0 else -1)
 
 
 def build_dcel_from_file():
@@ -235,6 +275,79 @@ def build_dcel_from_file():
     road_network = dcel.Dcel()
     road_network.build_dcel(vertices, segments)
     return road_network
+
+
+# def compute_parameters(road_network, vehicle, frames):
+#     print("Computation in progress...")
+#     start = time.time()
+#
+#     parameters = {
+#         'vehicle': [],
+#         'velocity': [],
+#         'speed': [],
+#         'acc': [],
+#         'acc_magnitude': [],
+#         'error': [],
+#         'intersection_points': [],
+#         'text': [],
+#         'trail_x': [],
+#         'trail_y': []
+#     }
+#     with tqdm(total=frames) as pbar:
+#         for _ in range(frames):
+#             vehicle_x, vehicle_y = vehicle.get_car_mid_point()
+#
+#             parameters['trail_x'].append(vehicle_x)
+#             parameters['trail_y'].append(vehicle_y)
+#
+#             vehicle.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
+#
+#             if vehicle.current_face is None:
+#                 vehicle.current_face = vehicle.prev_face
+#             if vehicle.current_face is not None:
+#
+#                 vehicle.prev_face = vehicle.current_face
+#
+#                 intersection_points_list = get_closest_intersection_points(vehicle)
+#
+#                 vehicle.face_mid_point = get_mid_point([(intersection_points_list[0][0], intersection_points_list[0][1]),
+#                                                         (intersection_points_list[1][0], intersection_points_list[1][1])])
+#
+#                 vehicle.prev_error = vehicle.error
+#                 vehicle.error = get_error(vehicle, intersection_points_list)
+#                 # vehicle.error = get_error_from_track(vehicle)
+#                 vehicle.update_state_vars()
+#
+#                 text = (f'acc: {str(vehicle.acc.norm())}'
+#                                 + '\ntheta: ' + str(vehicle.theta)
+#                                 # + '\nVelocity: ' + str(vehicle.velocity.norm())
+#                                 + '\nerror: ' + str(vehicle.error)
+#                                 # + '\nframe: ' + str(_)
+#                         )
+#                 parameters['text'].append(text)
+#
+#                 x, y = vehicle.get_xy_lists()
+#                 parameters['vehicle'].append((x, y))
+#
+#                 x = [vehicle_x, vehicle.velocity.get_x() + vehicle_x]
+#                 y = [vehicle_y, vehicle.velocity.get_y() + vehicle_y]
+#                 parameters['velocity'].append((x, y))
+#
+#                 x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
+#                 y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
+#                 parameters['acc'].append((x, y))
+#                 parameters['acc_magnitude'].append(vehicle.acc_magnitude)
+#                 parameters['speed'].append(vehicle.velocity.norm())
+#                 parameters['error'].append(vehicle.error)
+#
+#                 intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
+#                 parameters['intersection_points'].append(intersection_points_list)
+#             pbar.update(1)
+#
+#     end = time.time()
+#     print(f"{int(end - start)} Seconds")
+#
+#     return parameters
 
 
 def compute_parameters(road_network, vehicle, frames):
@@ -248,10 +361,10 @@ def compute_parameters(road_network, vehicle, frames):
         'acc': [],
         'acc_magnitude': [],
         'error': [],
-        'intersection_points': [],
         'text': [],
         'trail_x': [],
-        'trail_y': []
+        'trail_y': [],
+        'projected_point':[]
     }
     with tqdm(total=frames) as pbar:
         for _ in range(frames):
@@ -260,48 +373,34 @@ def compute_parameters(road_network, vehicle, frames):
             parameters['trail_x'].append(vehicle_x)
             parameters['trail_y'].append(vehicle_y)
 
-            vehicle.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
+            vehicle.prev_error = vehicle.error
+            vehicle.error = get_error_from_track(vehicle)
+            projected_point = get_projected_point(vehicle)
+            vehicle.update_state_vars()
 
-            if vehicle.current_face is None:
-                vehicle.current_face = vehicle.prev_face
-            if vehicle.current_face is not None:
+            text = (f'acc: {str(vehicle.acc.norm())}'
+                            # + '\nvehicle: ' + str(get_vehicle_front_point(vehicle))
+                            # + '\nprojected_point: ' + str(get_projected_point(vehicle))
+                            + '\nframes: ' + str(_)
+                            + '\nerror: ' + str(vehicle.error)
+                    )
+            parameters['text'].append(text)
 
-                vehicle.prev_face = vehicle.current_face
+            x, y = vehicle.get_xy_lists()
+            parameters['vehicle'].append((x, y))
 
-                intersection_points_list = get_closest_intersection_points(vehicle)
+            x = [vehicle_x, vehicle.velocity.get_x() + vehicle_x]
+            y = [vehicle_y, vehicle.velocity.get_y() + vehicle_y]
+            parameters['velocity'].append((x, y))
 
-                vehicle.face_mid_point = get_mid_point([(intersection_points_list[0][0], intersection_points_list[0][1]),
-                                                        (intersection_points_list[1][0], intersection_points_list[1][1])])
+            x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
+            y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
+            parameters['acc'].append((x, y))
+            parameters['acc_magnitude'].append(vehicle.acc_magnitude)
+            parameters['speed'].append(vehicle.velocity.norm())
+            parameters['error'].append(vehicle.error)
+            parameters['projected_point'].append(projected_point)
 
-                vehicle.prev_error = vehicle.error
-                vehicle.error = get_error(vehicle, intersection_points_list)
-
-                vehicle.update_state_vars()
-
-                text = (f'acc: {str(vehicle.acc.norm())}'
-                                + '\ntheta: ' + str(vehicle.theta)
-                                # + '\nVelocity: ' + str(vehicle.velocity.norm())
-                                + '\nerror: ' + str(vehicle.error)
-                                # + '\nframe: ' + str(_)
-                        )
-                parameters['text'].append(text)
-
-                x, y = vehicle.get_xy_lists()
-                parameters['vehicle'].append((x, y))
-
-                x = [vehicle_x, vehicle.velocity.get_x() + vehicle_x]
-                y = [vehicle_y, vehicle.velocity.get_y() + vehicle_y]
-                parameters['velocity'].append((x, y))
-
-                x = [vehicle_x, vehicle.acc.get_x() + vehicle_x]
-                y = [vehicle_y, vehicle.acc.get_y() + vehicle_y]
-                parameters['acc'].append((x, y))
-                parameters['acc_magnitude'].append(vehicle.acc_magnitude)
-                parameters['speed'].append(vehicle.speed)
-                parameters['error'].append(vehicle.error)
-
-                intersection_points_list.append((vehicle.face_mid_point[0], vehicle.face_mid_point[1]))
-                parameters['intersection_points'].append(intersection_points_list)
             pbar.update(1)
 
     end = time.time()
@@ -326,6 +425,8 @@ def draw_roads(road_network, ax):
             ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=ROAD_COLOR)
         else:
             ax.fill(x, y, ec=ROAD_EDGE_COLOR, fc=NON_ROAD_COLOR)
+    x, y = vehicle.reference_track.xy
+    ax.plot(x, y)
 
 
 def plot_parameters(start, end):
@@ -369,7 +470,47 @@ def plot_parameters(start, end):
 
     # plt.show()
 
-    fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT} plot.png")
+    fig.savefig(f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT} speed {initial_speed} theta {vehicle.theta}plot.png")
+
+
+# def simulate(road_network, vehicle, frames, parameters, file_name):
+#     fig = plt.figure()
+#     ax = plt.gca()
+#     ax.set_aspect('equal', adjustable='box')
+#
+#     draw_roads(road_network, ax)
+#
+#     vehicle_line, = ax.plot([], [])
+#     trail_line, = ax.plot([], [], color=TRAIL_COLOR)
+#     ideal_trail_line, = ax.plot([], [], color='green')
+#
+#     ideal_trail_line.set_data([parameters['intersection_points'][j][2][0] for j in range(len(parameters['intersection_points']))],
+#                               [parameters['intersection_points'][j][2][1] for j in range(len(parameters['intersection_points']))])
+#     acc_line, = ax.plot([], [])
+#     velocity_line, = ax.plot([], [])
+#     intersection_points = ax.scatter([], [], color='red', s=5)
+#     text = ax.text(0, 80, vehicle.error)
+#
+#     def init():
+#         return vehicle_line, acc_line, velocity_line, intersection_points, text, ideal_trail_line
+#
+#     def animate(i):
+#         vehicle_line.set_data(parameters['vehicle'][i])
+#         velocity_line.set_data(parameters['velocity'][i])
+#         trail_line.set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
+#
+#         acc_line.set_data(parameters['acc'][i])
+#         intersection_points.set_offsets(parameters['intersection_points'][i])
+#         text.set_text(parameters['text'][i])
+#         return vehicle_line, velocity_line, acc_line, intersection_points, text, trail_line
+#
+#     print("Animation in progress...")
+#     start = time.time()
+#     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
+#     anim.save(file_name, writer='ffmpeg', fps=100)
+#     end = time.time()
+#     print("Animation COMPLETED....")
+#     print(f"{int(end - start)} Seconds")
 
 
 def simulate(road_network, vehicle, frames, parameters, file_name):
@@ -381,17 +522,14 @@ def simulate(road_network, vehicle, frames, parameters, file_name):
 
     vehicle_line, = ax.plot([], [])
     trail_line, = ax.plot([], [], color=TRAIL_COLOR)
-    ideal_trail_line, = ax.plot([], [], color='green')
 
-    ideal_trail_line.set_data([parameters['intersection_points'][j][2][0] for j in range(len(parameters['intersection_points']))],
-                              [parameters['intersection_points'][j][2][1] for j in range(len(parameters['intersection_points']))])
     acc_line, = ax.plot([], [])
     velocity_line, = ax.plot([], [])
-    intersection_points = ax.scatter([], [], color='red', s=5)
+    projected_point = ax.scatter([], [], color='red', s=5)
     text = ax.text(0, 80, vehicle.error)
 
     def init():
-        return vehicle_line, acc_line, velocity_line, intersection_points, text, ideal_trail_line
+        return vehicle_line, acc_line, velocity_line, projected_point, text
 
     def animate(i):
         vehicle_line.set_data(parameters['vehicle'][i])
@@ -399,9 +537,10 @@ def simulate(road_network, vehicle, frames, parameters, file_name):
         trail_line.set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
 
         acc_line.set_data(parameters['acc'][i])
-        intersection_points.set_offsets(parameters['intersection_points'][i])
+        projected_point.set_offsets((parameters['projected_point'][i].x, parameters['projected_point'][i].y))
+
         text.set_text(parameters['text'][i])
-        return vehicle_line, velocity_line, acc_line, intersection_points, text, trail_line
+        return vehicle_line, velocity_line, acc_line, text, trail_line
 
     print("Animation in progress...")
     start = time.time()
@@ -425,22 +564,21 @@ def write_to_file(arrays):
 
 
 def run():
-    road_network = build_dcel_from_file()
-
-    frames = 4000
-    parameters = compute_parameters(road_network, vehicle, frames)
-    write_to_file(parameters)
-
-    # simulation will start after closing the plot figure
-    plot_parameters(start=5, end=4000)
-
-    simulate(road_network, vehicle, frames=frames, parameters=parameters,
-            file_name=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT}.mp4")
+    draw_road_network()
+    # road_network = build_dcel_from_file()
+    #
+    # frames = 4000
+    # parameters = compute_parameters(road_network, vehicle, frames)
+    # write_to_file(parameters)
+    #
+    # # simulation will start after closing the plot figure
+    # plot_parameters(start=5, end=4000)
+    #
+    # simulate(road_network, vehicle, frames=frames, parameters=parameters,
+    #         file_name=f"p{car.P_ACC_WEIGHT} d {car.D_ACC_WEIGHT} speed {initial_speed} theta {vehicle.theta}.mp4")
 
 
 run()
+winsound.Beep(frequency=2500, duration=1000)
 
-frequency = 2500  # Set frequency to 2500 Hertz
-duration = 1000  # Set duration to 1000 ms = 1 second
-winsound.Beep(frequency, duration)
 
