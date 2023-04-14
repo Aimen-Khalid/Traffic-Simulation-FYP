@@ -8,7 +8,7 @@ from shapely import Point, LineString
 # constants
 dt = 0.01
 D_ACC_WEIGHT = 50
-P_ACC_WEIGHT = 10
+P_ACC_WEIGHT = 0.01
 
 
 # --------------------------------- utility functions -------------------------------- #
@@ -44,10 +44,12 @@ class Vehicle:
         self.length = length
         self.width = width
         self.speed_limit = 80
-        self.acc_limit = 45
+        self.acc_limit = 2.62
         self.theta = -90
         self.reference_track = LineString([(300, 55), (635, 55), (770, 220), (770, 500), (620, 620), (300, 620),
                                            (135, 500), (135, 230), (300, 55)])
+        # self.reference_track = LineString([(100, 100), (100, 250), (200, 300), (230, 220), (250, 250), (300, 300),
+        #                                    (360, 300), (440, 230), (440, 110), (500, 150), (610, 115)])
 
         # state variables
         self.centroid = centroid

@@ -14,6 +14,7 @@ class Face:
         self.fill_color = (random.random(), random.random(), random.random())
         self.polygon = None
         self.faces_inside = []
+        self.adjacent_faces = []
         self.parent = None
 
     def get_face_vertices(self):  # returns vertices of outer boundary of face
@@ -41,6 +42,15 @@ class Face:
             hedges.append(h1)
 
         return hedges
+
+    def get_adjacent_faces(self):
+        adjacent_faces = []
+        h = self.outer_component
+        while h.next != self.outer_component:  # Walk through all hedges of the cycle and set incident face
+            adjacent_faces.append(h.twin.incident_face)
+            h = h.next
+        adjacent_faces.append(h.twin.incident_face)
+        return adjacent_faces
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
@@ -125,7 +135,7 @@ class Edge:
 
 
 class Vertex:
-    def __init__(self, x, y, name):
+    def __init__(self, x, y, name='none'):
         self.x = x
         self.y = y
         self.name = name
@@ -237,6 +247,11 @@ class Dcel:
         self.__set_polygons()
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
+
+    def build_dcel_primary(self, points, segments):
+        self.__add_points(points)
+        self.__add_edges_and_twins(segments)
+        self.__add_next_and_previous_pointers()
 
     def __set_polygons(self):
         for face in self.faces:
@@ -359,7 +374,7 @@ class Dcel:
         max_face = None
         max_face_area = 0
         for hedge in self.hedges_map.get_all_hedges():
-            if hedge.incident_face is None and hedge.twin.incident_face is None:
+            if hedge.incident_face is None: #and hedge.twin.incident_face is None:
                 vertex_list = [(hedge.origin.x, hedge.origin.y)]  # For calculating face size later
 
                 number_of_faces += 1
@@ -373,11 +388,11 @@ class Dcel:
                 h = hedge
                 while h.next != hedge:  # Walk through all hedges of the cycle and set incident face
                     h.incident_face = f
-                    h.twin.incident_face = f
+                    #h.twin.incident_face = f
                     h = h.next
                     vertex_list.append((h.origin.x, h.origin.y))
                 h.incident_face = f
-                h.twin.incident_face = f
+                #h.twin.incident_face = f
 
                 self.faces.append(f)
 
