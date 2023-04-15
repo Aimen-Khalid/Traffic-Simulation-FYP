@@ -10,6 +10,8 @@ import time
 from tqdm import tqdm
 import winsound
 from shapely import Point, LineString
+import networkx as nx
+
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'white'
@@ -646,6 +648,8 @@ def translate_segment(segment, length, anticlockwise=False):
     # Extract the starting and ending points of the segment
     start, end = segment
 
+    start = Point(start[0], start[1])
+    end = Point(end[0], end[1])
     # Compute the vector representing the segment
     dx = end.x - start.x
     dy = end.y - start.y
@@ -666,83 +670,242 @@ def translate_segment(segment, length, anticlockwise=False):
     # Return the translated segment as a list of two tuples
     return [(new_start_x, new_start_y), (new_end_x, new_end_y)]
 
-lane_width = 30
-draw_road_network_primary()
-road_network = build_dcel_from_file_primary()
-for vertex in road_network.vertices_map.values():
-    hedges = road_network.hedges_map.get_outgoing_hedges_clockwise(vertex)
-    if len(hedges) < 2:
-        continue
 
-    if len(hedges) == 1:
-        translate_segment((hedges[0].origin, hedges[0].destination), lane_width)
-
+def map_overlay():
+    lane_width = 30
+    # draw_road_network_primary()
+    road_network = build_dcel_from_file_primary()
     vertices = []
     segments = []
+    for vertex in road_network.vertices_map.values():
+        hedges = road_network.hedges_map.get_outgoing_hedges_clockwise(vertex)
+        if len(hedges) < 1:
+            continue
+        if len(hedges) == 1:
+            segments.append(translate_segment((hedges[0].origin, hedges[0].destination), lane_width))
+            segments.append(translate_segment((hedges[0].origin, hedges[0].destination), lane_width, anticlockwise=True))
+            vertices.append((segments[0][0][0], segments[0][0][1]))
+            vertices.append((segments[0][1][0], segments[0][1][1]))
 
-    angles = []
-    bisector_points = []
-    translated_segments_cw = []
-    translated_segments_acw = []
+            vertices.append((segments[1][0][0], segments[1][0][1]))
+            vertices.append((segments[1][1][0], segments[1][1][1]))
+            continue
 
-    for i, hedge in enumerate(hedges):
-        if i + 1 == len(hedges):
-            i = -1
-        angles.append(angle_between_segments((hedge.origin, hedge.destination), (hedges[i + 1].origin,
-                                                                              hedges[i + 1].destination)))
-        if i == -1:
-            i = len(hedges) - 1
-        bisector_points.append(rotate_line(hedge.origin, hedge.destination, angles[i]/2))
-        translated_segments_cw.append(translate_segment((hedge.origin, hedge.destination), 30))
-        translated_segments_acw.append(translate_segment((hedge.origin, hedge.destination), 30, anticlockwise=True))
+        translated_segments_cw = []
+        translated_segments_acw = []
 
-        segment1 = [(hedge.origin.x, hedge.origin.y), bisector_points[i]]
-        segment2 = translated_segments_cw[i]
+        for i, hedge in enumerate(hedges):
+            if i + 1 == len(hedges):
+                i = -1
+            if i == -1:
+                i = len(hedges) - 1
+            translated_segments_cw.append(translate_segment((hedge.origin, hedge.destination), 30))
+            translated_segments_acw.append(translate_segment((hedge.origin, hedge.destination), 30, anticlockwise=True))
 
-        segment2[0] = tuple(get_intersection_point(segment1, segment2))
-        vertices.append((segment2[0][0], segment2[0][1]))
-        vertices.append((segment2[1][0], segment2[1][1]))
-        segments.append(segment2)
+        for i, hedge in enumerate(hedges):
+            print(i)
+            if i + 1 == len(hedges):
+                segment1 = translated_segments_acw[0]
+            else:
+                segment1 = translated_segments_acw[i + 1]
+            segment2 = translated_segments_cw[i]
 
-    for i, hedge in enumerate(hedges):
-        segment2 = translated_segments_acw[i]
-        segment = [translated_segments_acw[i][1], translated_segments_cw[i][1]]
-        segments.append(segment)
-        if i-1 == -1:
-            i = len(hedges)
+            segment2[0] = tuple(get_intersection_point(segment1, segment2))
+            segment1[0] = tuple(get_intersection_point(segment1, segment2))
+            vertices.append((segment2[0][0], segment2[0][1]))
+            vertices.append((segment2[1][0], segment2[1][1]))
 
-        segment1 = [(hedge.origin.x, hedge.origin.y), bisector_points[i-1]]
-        segment2[0] = tuple(get_intersection_point(segment1, segment2))
-        vertices.append((segment2[0][0], segment2[0][1]))
-        vertices.append((segment2[1][0], segment2[1][1]))
-        segments.append(segment2)
+            vertices.append((segment1[1][0], segment1[1][1]))
+
+            segments.append(segment2)
+            segments.append(segment1)
+
+    fig, ax = plt.subplots()
+    for segment in segments:
+        start, end = segment
+        ax.plot([start[0], end[0]], [start[1], end[1]], 'b-')
+    plt.show()
+
+    dcel_obj = dcel.Dcel()
+    dcel_obj.build_dcel(vertices, segments)
+    dcel_obj.show_dcel()
+
+# map_overlay()
+
+
+def get_angle(edge):
+    origin, destination = edge[0], edge[1]
+    dx = destination[0] - origin[0]
+    dy = destination[1] - origin[1]
+    length = math.sqrt(dx * dx + dy * dy)
+    if dy > 0:
+        return math.acos(dx / length)
+    else:
+        return 2 * math.pi - math.acos(dx / length)
+
+
+def get_edges_cw(graph, node):
+    outgoing_edges = list(graph.edges(node))
+    outgoing_edges.sort(key=lambda e: get_angle(e), reverse=True)
+    return outgoing_edges
+
+
+# draw_road_network_primary()
+G = nx.DiGraph()
+# Add vertices to the graph
+vertices_ = load_vertices_from_file()
+segments_ = load_segments_from_file()
+# Add nodes to the graph with their specific positions
+for vertex in vertices_:
+    G.add_node(vertex, pos=vertex)
+# Add edges to the graph
+for segment in segments_:
+    G.add_edge(segment[0], segment[1], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None)
+    G.add_edge(segment[1], segment[0], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None)
+
+
+# Get the node positions from their attributes
+node_positions = nx.get_node_attributes(G, 'pos')
+
+# Draw the graph with node positions
+nx.draw(G, pos=node_positions, node_size=20, font_size=8, with_labels=True)
+plt.show()
+
+# Print the outgoing edges
+# print(outgoing_edges)
+
+
+def graph_to_lanes(G):
+    vertices = []
+    segments = []
+    partitions = []
+
+    lane_width = 30
+    for node in G.nodes:
+        if G.degree(node) == 2:
+            outgoing_edge = list(G.edges(node))[0]
+            if not G.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start']:
+                cw_start = translate_segment(outgoing_edge, lane_width)[0]
+                acw_start = translate_segment(outgoing_edge, lane_width, anticlockwise=True)[0]
+                if G.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is None:
+                    nx.set_edge_attributes(G, {
+                        (outgoing_edge[0], outgoing_edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
+                    nx.set_edge_attributes(G, {
+                        (outgoing_edge[1], outgoing_edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
+            continue
+        translated_segments_cw = []
+        translated_segments_acw = []
+
+        edges = get_edges_cw(G, node)
+        for edge in edges:
+            translated_segments_cw.append(translate_segment(edge, lane_width))
+            translated_segments_acw.append(translate_segment(edge, lane_width, anticlockwise=True))
+
+        for i, edge in enumerate(edges):
+            if i + 1 == len(edges):
+                segment1 = translated_segments_acw[0]
+            else:
+                segment1 = translated_segments_acw[i + 1]
+            segment2 = translated_segments_cw[i]
+            segment3 = translated_segments_acw[i]
+            if i == 0:
+                segment4 = translated_segments_cw[len(edges)-1]
+            else:
+                segment4 = translated_segments_cw[i - 1]
+            cw_start = tuple(get_intersection_point(segment1, segment2))
+            acw_start = tuple(get_intersection_point(segment3, segment4))
+            if G.get_edge_data(edge[0], edge[1])['cw_start'] is None:
+                nx.set_edge_attributes(G, {(edge[0], edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
+                nx.set_edge_attributes(G, {(edge[1], edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
+            # vertices.extend((cw_start, acw_start))
+    for node in G.nodes:
+        edges = get_edges_cw(G, node)
+        for edge in edges:
+            if G.get_edge_data(edge[0], edge[1])['cw_end'][0] is not None:
+                continue
+            neighbor_edges = get_edges_cw(G, edge[1])
+            if len(neighbor_edges) == 1:
+                cw_end = translate_segment(edge, lane_width)[1]
+                acw_end = translate_segment(edge, lane_width, anticlockwise=True)[1]
+                nx.set_edge_attributes(G, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
+                nx.set_edge_attributes(G, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
+                continue
+            # u, v = edge[0], edge[1]
+            # edge = (v, u)
+            index = neighbor_edges.index(edge)
+            prev = len(neighbor_edges) - 1 if index == 0 else index - 1
+            cw_end = G.get_edge_data(neighbor_edges[prev][0], neighbor_edges[prev][1])['cw_start']
+            next_ = 0 if index == len(neighbor_edges) - 1 else index + 1
+            acw_end = G.get_edge_data(neighbor_edges[next_][0], neighbor_edges[next_][1])['acw_start']
+            if G.get_edge_data(edge[0], edge[1])['cw_end'] is None:
+                nx.set_edge_attributes(G, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
+                nx.set_edge_attributes(G, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
+            # vertices.extend((cw_end, acw_end))
+
+    for node in G.nodes:
+        edges = get_edges_cw(G, node)
+        for edge in edges:
+            if G.get_edge_data(edge[0], edge[1])['visited']:
+                continue
+            nx.set_edge_attributes(G, {(edge[0], edge[1]): {'visited': True}})
+            nx.set_edge_attributes(G, {(edge[1], edge[0]): {'visited': True}})
+            vertices.extend([edge[0], edge[1]])
+            segments.extend(
+                (
+                    [
+                        (G.get_edge_data(edge[0], edge[1])['cw_start']),
+                        (G.get_edge_data(edge[0], edge[1])['cw_end']),
+                    ],
+                    [
+                        (G.get_edge_data(edge[0], edge[1])['acw_start']),
+                        (G.get_edge_data(edge[0], edge[1])['acw_end']),
+                    ],
+                )
+            )
+            partitions.extend(
+                (
+                    [
+                        (G.get_edge_data(edge[0], edge[1])['cw_start']),
+                        (G.get_edge_data(edge[0], edge[1])['acw_start']),
+                    ],
+                    [
+                        (G.get_edge_data(edge[0], edge[1])['cw_end']),
+                        (G.get_edge_data(edge[0], edge[1])['acw_end']),
+                    ],)
+            )
+    return vertices, segments, partitions
+
+
+vertices, segments, partitions = graph_to_lanes(G)
+# print(segments)
 
 fig, ax = plt.subplots()
+
 for segment in segments:
     start, end = segment
-    ax.plot([start[0], end[0]], [start[1], end[1]], 'b-')
+    x_values = [start[0], end[0]]
+    print(segment)
+    y_values = [start[1], end[1]]
+    # ax.text(start[0], start[1], f"{round(start[0])},{str(round(start[1]))}", fontsize=6, color='green')
+    # ax.text(end[0], end[1], f"{round(end[0])},{str(round(end[1]))}", fontsize=6, color='green')
+    ax.plot(x_values, y_values, color='green')
+
+for segment in segments_:
+    start, end = segment
+    x_values = [start[0], end[0]]
+    y_values = [start[1], end[1]]
+    # ax.text(start[0], start[1], f"{round(start[0])},{str(round(start[1]))}", fontsize=6, color='black')
+    # ax.text(end[0], end[1], f"{round(end[0])},{str(round(end[1]))}", fontsize=6, color='black')
+    ax.plot(x_values, y_values, color='black')
+
+for segment in partitions:
+    start, end = segment
+    x_values = [start[0], end[0]]
+    y_values = [start[1], end[1]]
+    ax.plot(x_values, y_values, color='grey')
+
+ax.set_aspect('equal')
 plt.show()
-print(vertices)
-print(segments)
-
-
-dcel_obj = dcel.Dcel()
-dcel_obj.build_dcel(vertices, segments)
-dcel_obj.show_dcel()
 
 
 
-
-
-# print(hedges)
-
-
-# graph = {(10, 10): [Destination((50, 10)), Destination((10, 40))]}
-# segments = []
-#
-# for start, ends in graph.items():
-#     for end in ends:
-#         segments.append([start, end])
-#
-# angle = angle_between_segments(segments[1], segments[0])
-# print(angle)
