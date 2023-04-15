@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
-
+ROAD = 1
+NON_ROAD = 0
+BOUNDARY = 1
+PARTITION = 0
 
 class Face:
     def __init__(self):
@@ -16,6 +19,7 @@ class Face:
         self.faces_inside = []
         self.adjacent_faces = []
         self.parent = None
+        self.tag = NON_ROAD
 
     def get_face_vertices(self):  # returns vertices of outer boundary of face
         hedge = self.outer_component
@@ -102,6 +106,7 @@ class Edge:
         self.origin = self.right_arrow.origin
         # Assumed is that of undirected edges, the origin is the `left-most' endpoint
         self.destination = self.right_arrow.destination
+        self.tag = None
 
     def __repr__(self):
         return f"Edge: [ ({self.origin.x}, {self.origin.y}), ({self.destination.x}, {self.destination.y})]"
@@ -215,6 +220,7 @@ class OuterFace(Face):
         self.top_segment = None
         self.bottom_segment = None
         self.inner_component = None
+        self.tag = NON_ROAD
 
     def set_vertices(self, vertices):
         self.upper_left = vertices[0]
@@ -230,8 +236,9 @@ class OuterFace(Face):
 
 
 class Dcel:
-    def __init__(self):
+    def __init__(self, graph=None):
         # (x coordinate, y coordinate) -> vertex
+        self.graph = graph
         self.vertices_map = {}
         self.hedges_map = HedgesMap()
         self.faces = []
@@ -247,11 +254,30 @@ class Dcel:
         self.__set_polygons()
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
+        self.__set_face_tags()
+        self.__set_edge_tags()
 
     def build_dcel_primary(self, points, segments):
         self.__add_points(points)
         self.__add_edges_and_twins(segments)
         self.__add_next_and_previous_pointers()
+
+    def __set_edge_tags(self):
+        for edge in self.edges:
+            if edge.right_arrow.incident_face.tag == edge.left_arrow.incident_face.tag:
+                edge.tag = PARTITION
+            else:
+                edge.tag = BOUNDARY
+
+    def __set_face_tags(self):
+        midpoints = [((edge[0][0] + edge[1][0])/2, (edge[0][1] + edge[1][1])/2) for edge in self.graph.edges]
+
+        for midpoint in midpoints:
+            self.get_face_for_point(midpoint).tag = ROAD
+
+        nodes = [node for node in self.graph.nodes if self.graph.degree(node) > 4]
+        for node in nodes:
+            self.get_face_for_point(node).tag = ROAD
 
     def __set_polygons(self):
         for face in self.faces:
@@ -264,8 +290,24 @@ class Dcel:
             x = [x for x, y in vertices]
             y = [y for x, y in vertices]
             plt.fill(x, y, color=face.fill_color)
-            for vertex in vertices:
-                plt.scatter(vertex[0], vertex[1])
+            # for vertex in vertices:
+            #     plt.scatter(vertex[0], vertex[1])
+        plt.show()
+
+    def show_road_network(self):
+        fig, ax = plt.subplots()
+        for face in self.faces:
+            if face.tag == ROAD:
+                x, y = face.polygon.exterior.xy
+                # Plot the polygon and fill it with grey color
+                ax.fill(x, y, color='grey', alpha=0.5, edgecolor='none')
+
+        boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
+        for edge in boundary_edges:
+            x = [edge.origin.x, edge.destination.x]
+            y = [edge.origin.y, edge.destination.y]
+            ax.plot(x, y, color='black')
+
         plt.show()
 
     def get_face_for_point(self, point):
@@ -457,6 +499,7 @@ class Dcel:
                 while h.direction == CLOCKWISE and h.next != hedge:  # Walk through all hedges of the cycle and set incident face
                     if h.incident_face is not None:
                         if h.incident_face.parent is None:
+                            self.faces.remove(h.incident_face)
                             h.incident_face.parent = self.outer_face
                         # h.incident_face.parent.outer_component = h
                         h.incident_face = h.incident_face.parent

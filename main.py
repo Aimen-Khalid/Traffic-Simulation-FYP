@@ -750,7 +750,7 @@ def get_edges_cw(graph, node):
     return outgoing_edges
 
 
-# draw_road_network_primary()
+draw_road_network_primary()
 G = nx.DiGraph()
 # Add vertices to the graph
 vertices_ = load_vertices_from_file()
@@ -770,9 +770,6 @@ node_positions = nx.get_node_attributes(G, 'pos')
 # Draw the graph with node positions
 nx.draw(G, pos=node_positions, node_size=20, font_size=8, with_labels=True)
 plt.show()
-
-# Print the outgoing edges
-# print(outgoing_edges)
 
 
 def graph_to_lanes(G):
@@ -849,7 +846,6 @@ def graph_to_lanes(G):
                 continue
             nx.set_edge_attributes(G, {(edge[0], edge[1]): {'visited': True}})
             nx.set_edge_attributes(G, {(edge[1], edge[0]): {'visited': True}})
-            vertices.extend([edge[0], edge[1]])
             segments.extend(
                 (
                     [
@@ -860,6 +856,14 @@ def graph_to_lanes(G):
                         (G.get_edge_data(edge[0], edge[1])['acw_start']),
                         (G.get_edge_data(edge[0], edge[1])['acw_end']),
                     ],
+                )
+            )
+            vertices.extend(
+                (
+                        (G.get_edge_data(edge[0], edge[1])['cw_start']),
+                        (G.get_edge_data(edge[0], edge[1])['cw_end']),
+                        (G.get_edge_data(edge[0], edge[1])['acw_start']),
+                        (G.get_edge_data(edge[0], edge[1])['acw_end']),
                 )
             )
             partitions.extend(
@@ -884,10 +888,9 @@ fig, ax = plt.subplots()
 for segment in segments:
     start, end = segment
     x_values = [start[0], end[0]]
-    print(segment)
     y_values = [start[1], end[1]]
-    # ax.text(start[0], start[1], f"{round(start[0])},{str(round(start[1]))}", fontsize=6, color='green')
-    # ax.text(end[0], end[1], f"{round(end[0])},{str(round(end[1]))}", fontsize=6, color='green')
+    ax.text(start[0], start[1], f"{round(start[0])},{str(round(start[1]))}", fontsize=6, color='green')
+    ax.text(end[0], end[1], f"{round(end[0])},{str(round(end[1]))}", fontsize=6, color='green')
     ax.plot(x_values, y_values, color='green')
 
 for segment in segments_:
@@ -898,6 +901,10 @@ for segment in segments_:
     # ax.text(end[0], end[1], f"{round(end[0])},{str(round(end[1]))}", fontsize=6, color='black')
     ax.plot(x_values, y_values, color='black')
 
+unique_partitions = {frozenset(segment) for segment in partitions}
+unique_partitions = [list(segment) for segment in unique_partitions]
+segments.extend(unique_partitions)
+
 for segment in partitions:
     start, end = segment
     x_values = [start[0], end[0]]
@@ -906,6 +913,16 @@ for segment in partitions:
 
 ax.set_aspect('equal')
 plt.show()
+
+dcel_obj = dcel.Dcel(G)
+dcel_obj.build_dcel(vertices, segments)
+dcel_obj.show_road_network()
+
+
+
+
+
+
 
 
 
