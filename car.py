@@ -8,7 +8,7 @@ from shapely import Point, LineString
 # constants
 dt = 0.01
 D_ACC_WEIGHT = 50
-P_ACC_WEIGHT = 0.01
+P_ACC_WEIGHT = 10
 
 
 # --------------------------------- utility functions -------------------------------- #
@@ -44,7 +44,7 @@ class Vehicle:
         self.length = length
         self.width = width
         self.speed_limit = 80
-        self.acc_limit = 2.62
+        self.acc_limit = 45
         self.theta = -90
         self.reference_track = LineString([(300, 55), (635, 55), (770, 220), (770, 500), (620, 620), (300, 620),
                                            (135, 500), (135, 230), (300, 55)])
@@ -108,8 +108,8 @@ class Vehicle:
         return v1, v2
 
     def controller(self):
-        # if self.face_mid_point is None:
-        #     return self.acc
+        if self.face_mid_point is None:
+            return self.acc
 
         p_acc_magnitude = self.error
         d_acc_magnitude = self.error - self.prev_error

@@ -1,14 +1,20 @@
 import math as m
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, LineString, MultiPoint
 import random
 import matplotlib.pyplot as plt
+import traceback
+import shapely
+from utility import get_intersection_point
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
 ROAD = 1
-NON_ROAD = 0
-BOUNDARY = 1
-PARTITION = 0
+NON_ROAD = 2
+BOUNDARY = 3
+PARTITION = 4
+JUNCTION = 5
+ROAD_SEPARATOR = 6
+
 
 class Face:
     def __init__(self):
@@ -20,6 +26,9 @@ class Face:
         self.adjacent_faces = []
         self.parent = None
         self.tag = NON_ROAD
+        self.road_separator = None
+        self.lane_separators = []
+        self.lane_curves = []
 
     def get_face_vertices(self):  # returns vertices of outer boundary of face
         hedge = self.outer_component
@@ -55,6 +64,25 @@ class Face:
             h = h.next
         adjacent_faces.append(h.twin.incident_face)
         return adjacent_faces
+
+    def is_polygon_inside(self, polygon2):
+        try:
+            if self.within(polygon2):
+                return True
+            elif polygon2.within(self):
+                return True
+        except shapely.errors.TopologicalError:
+            for poly in [self, polygon2]:
+                for i, pt in enumerate(poly.exterior.coords):
+                    try:
+                        poly.representative_point().within(polygon2)
+                    except shapely.errors.TopologicalError:
+                        continue
+                    else:
+                        face = poly.exterior.coords[i - 1:i + 2]
+                        face_polygon = shapely.geometry.Polygon(face)
+                        return poly.is_polygon_inside(face_polygon)
+        return False
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
@@ -235,6 +263,50 @@ class OuterFace(Face):
         self.outer_component = edges[2].right_arrow
 
 
+def translate_segment(segment, length, anticlockwise=False):
+    if anticlockwise:
+        length = -1 * length
+    # Extract the starting and ending points of the segment
+    start, end = segment
+
+    start = Point(start[0], start[1])
+    end = Point(end[0], end[1])
+    # Compute the vector representing the segment
+    dx = end.x - start.x
+    dy = end.y - start.y
+
+    # Compute the length of the vector
+    vector_length = ((dx ** 2) + (dy ** 2)) ** 0.5
+    if vector_length == 0:
+        vector_length = 1
+    # Compute the cosine and sine of the angle between the vector and the x-axis
+    cos_theta = dx / vector_length
+    sin_theta = dy / vector_length
+
+    # Translate the starting and ending points of the segment
+    new_start_x = start.x + length * sin_theta
+    new_start_y = start.y - length * cos_theta
+    new_end_x = end.x + length * sin_theta
+    new_end_y = end.y - length * cos_theta
+
+    # Return the translated segment as a list of two tuples
+    return [(new_start_x, new_start_y), (new_end_x, new_end_y)]
+
+
+def get_edge_intersection_points(edge, polygon):
+    exterior = polygon.exterior
+    points = list(exterior.coords)
+    polygon_edges = [(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    polygon_edges.append((points[-1], points[0]))
+    min_x, min_y, max_x, max_y = polygon.bounds
+    intersection_points = []
+    for e in polygon_edges:
+        point = get_intersection_point(e, edge)
+        if point != [None] and min_x < point[0] < max_x and min_y < point[1] < max_y:
+            intersection_points.append(point)
+    return intersection_points
+
+
 class Dcel:
     def __init__(self, graph=None):
         # (x coordinate, y coordinate) -> vertex
@@ -264,20 +336,40 @@ class Dcel:
 
     def __set_edge_tags(self):
         for edge in self.edges:
-            if edge.right_arrow.incident_face.tag == edge.left_arrow.incident_face.tag:
+            if edge.tag is not None:
+                continue
+            if edge.right_arrow.incident_face.tag in [ROAD, JUNCTION] and \
+                    edge.left_arrow.incident_face.tag in [ROAD, JUNCTION]:
                 edge.tag = PARTITION
             else:
                 edge.tag = BOUNDARY
 
     def __set_face_tags(self):
-        midpoints = [((edge[0][0] + edge[1][0])/2, (edge[0][1] + edge[1][1])/2) for edge in self.graph.edges]
+        edges = list(self.graph.edges)
+        for edge in edges:
+            # for e in self.edges:
+            #     if e.origin.x == edge[0][0] and e.origin.y == edge[0][1] and e.destination.x == edge[1][0] and e.destination.y == edge[1][1]:
+            #         e.tag = ROAD_SEPARATOR
+            #         break
+            translated_edges = [translate_segment(edge, 0.5), translate_segment(edge, 0.5, True)]
+            midpoints = [((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2) for edge in translated_edges]
+            for midpoint in midpoints:
+                face = self.get_face_for_point(midpoint)
+                face.tag = ROAD
+                face.road_separator = get_edge_intersection_points(edge, face.polygon)
+                face.lane_separators.append(get_edge_intersection_points(translate_segment(edge, 0.5), face.polygon))
+                face.lane_separators.append(get_edge_intersection_points(translate_segment(edge, 0.5, True), face.polygon))
 
-        for midpoint in midpoints:
-            self.get_face_for_point(midpoint).tag = ROAD
+                face.lane_curves.append(get_edge_intersection_points(translate_segment(edge, 0.25), face.polygon))
+                face.lane_curves.append(get_edge_intersection_points(translate_segment(edge, 0.75), face.polygon))
+                face.lane_curves.append(
+                    get_edge_intersection_points(translate_segment(edge, 0.25, True), face.polygon))
+                face.lane_curves.append(
+                    get_edge_intersection_points(translate_segment(edge, 0.75, True), face.polygon))
 
         nodes = [node for node in self.graph.nodes if self.graph.degree(node) > 4]
         for node in nodes:
-            self.get_face_for_point(node).tag = ROAD
+            self.get_face_for_point(node).tag = JUNCTION
 
     def __set_polygons(self):
         for face in self.faces:
@@ -286,21 +378,69 @@ class Dcel:
 
     def show_dcel(self):
         for face in self.faces:
-            vertices = face.get_face_vertices()
-            x = [x for x, y in vertices]
-            y = [y for x, y in vertices]
-            plt.fill(x, y, color=face.fill_color)
-            # for vertex in vertices:
-            #     plt.scatter(vertex[0], vertex[1])
+            # if not face.polygon.is_valid:
+
+            x, y = face.polygon.exterior.xy
+            plt.plot(x, y)
+            if face.tag is not ROAD:
+                continue
+            x = [face.lane_curves[0][0][0], face.lane_curves[0][1][0]]
+            y = [face.lane_curves[0][0][1], face.lane_curves[0][1][1]]
+            plt.plot(x, y, color='blue', linewidth=0.5)
+            plt.text(x[0], y[0], f"{x}, {y}")
+            plt.text(x[-1], y[-1], f"{x}, {y}")
+
+            x = [face.lane_curves[1][0][0], face.lane_curves[1][1][0]]
+            y = [face.lane_curves[1][0][1], face.lane_curves[1][1][1]]
+            plt.plot(x, y, color='blue', linewidth=0.5)
+            plt.text(x[0], y[0], f"{x}, {y}")
+            plt.text(x[0], y[0], f"{x}, {y}")
+            break
+            # plt.text(x[0], y[1], face.name, fontsize=6, color='black')
+
+            # for i in range (len(x)):
+            #     plt.text(x[i], y[i], f"{x[i]}, {y[i]}", fontsize=6, color='black')
+            # plt.fill(x, y, color=face.fill_color)
+        # for vertex in vertices:
+        #     plt.scatter(vertex[0], vertex[1])
         plt.show()
 
     def show_road_network(self):
         fig, ax = plt.subplots()
         for face in self.faces:
-            if face.tag == ROAD:
+            if face.tag in [ROAD, JUNCTION]:
                 x, y = face.polygon.exterior.xy
                 # Plot the polygon and fill it with grey color
+                # ax.text(x[0], y[0], face.name, fontsize=6, color='black')
                 ax.fill(x, y, color='grey', alpha=0.5, edgecolor='none')
+            if face.tag == ROAD:
+                x = [face.road_separator[0][0], face.road_separator[1][0]]
+                y = [face.road_separator[0][1], face.road_separator[1][1]]
+                ax.plot(x, y, color='black', linewidth=0.5)
+
+                x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
+                y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
+                ax.plot(x, y, color='white', linewidth=0.5, linestyle='--')
+
+                x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
+                y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
+                ax.plot(x, y, color='white', linewidth=0.5, linestyle='--')
+
+                x = [face.lane_curves[0][0][0], face.lane_curves[0][1][0]]
+                y = [face.lane_curves[0][0][1], face.lane_curves[0][1][1]]
+                ax.plot(x, y, color='blue', linewidth=0.5)
+
+                x = [face.lane_curves[1][0][0], face.lane_curves[1][1][0]]
+                y = [face.lane_curves[1][0][1], face.lane_curves[1][1][1]]
+                ax.plot(x, y, color='blue', linewidth=0.5)
+
+                x = [face.lane_curves[2][0][0], face.lane_curves[2][1][0]]
+                y = [face.lane_curves[2][0][1], face.lane_curves[2][1][1]]
+                ax.plot(x, y, color='blue', linewidth=0.5)
+
+                x = [face.lane_curves[3][0][0], face.lane_curves[3][1][0]]
+                y = [face.lane_curves[3][0][1], face.lane_curves[3][1][1]]
+                ax.plot(x, y, color='blue', linewidth=0.5)
 
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
@@ -308,12 +448,24 @@ class Dcel:
             y = [edge.origin.y, edge.destination.y]
             ax.plot(x, y, color='black')
 
-        plt.show()
+        partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
+        for edge in partition_edges:
+            x = [edge.origin.x, edge.destination.x]
+            y = [edge.origin.y, edge.destination.y]
+            ax.plot(x, y, color='white', linewidth=0.5)
+
+        # road_separator_edges = [edge for edge in self.edges if edge.tag == ROAD_SEPARATOR]
+        # for edge in road_separator_edges:
+        #     x = [edge.origin.x, edge.destination.x]
+        #     y = [edge.origin.y, edge.destination.y]
+        #     ax.plot(x, y, color='black', linewidth=0.5)
+
+        plt.show(block=True)
 
     def get_face_for_point(self, point):
         point = Point(point[0], point[1])
         for face in self.faces:
-            if point.within(face.polygon):
+            if point.within(face.polygon) or face.polygon.boundary.contains(point):
                 return face
 
     def get_vertices(self):
@@ -416,7 +568,7 @@ class Dcel:
         max_face = None
         max_face_area = 0
         for hedge in self.hedges_map.get_all_hedges():
-            if hedge.incident_face is None: #and hedge.twin.incident_face is None:
+            if hedge.incident_face is None:
                 vertex_list = [(hedge.origin.x, hedge.origin.y)]  # For calculating face size later
 
                 number_of_faces += 1
@@ -475,10 +627,18 @@ class Dcel:
             for j in range(i + 1, len(self.faces)):
                 face2 = self.faces[j]
                 # Check if face1 is contained within face2 or vice versa
-                if face1.polygon.within(face2.polygon) and face1 != face2:
-                    face2.faces_inside.append(face1)
-                elif face2.polygon.within(face1.polygon) and face1 != face2:
-                    face1.faces_inside.append(face2)
+                try:
+                    if face1.polygon.within(face2.polygon) and face1 != face2:
+                        face2.faces_inside.append(face1)
+                    elif face2.polygon.within(face1.polygon) and face1 != face2:
+                        face1.faces_inside.append(face2)
+                except Exception as e:
+                    print(face1, face2)
+                    print(face1.get_face_vertices())
+                    print(face2.get_face_vertices())
+                    print(e)
+                    traceback.print_exc()
+                    return
 
         # Loop over each face
         for i in range(len(self.faces)):
