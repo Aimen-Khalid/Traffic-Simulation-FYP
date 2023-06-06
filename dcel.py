@@ -4,7 +4,8 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from utility import get_intersection_point
+from geometry_functions import get_intersection_point, get_interpolated_curve
+from graph_to_road_network import get_translated_vertices_segments
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -60,9 +61,11 @@ class Face:
         adjacent_faces = []
         h = self.outer_component
         while h.next != self.outer_component:  # Walk through all hedges of the cycle and set incident face
-            adjacent_faces.append(h.twin.incident_face)
+            if h.twin.incident_face.name != "BBox":
+                adjacent_faces.append(h.twin.incident_face)
             h = h.next
-        adjacent_faces.append(h.twin.incident_face)
+        if h.twin.incident_face.name != "BBox":
+            adjacent_faces.append(h.twin.incident_face)
         return adjacent_faces
 
     def is_polygon_inside(self, polygon2):
@@ -290,7 +293,8 @@ def translate_segment(segment, length, anticlockwise=False):
     new_end_y = end.y - length * cos_theta
 
     # Return the translated segment as a list of two tuples
-    return [(new_start_x, new_start_y), (new_end_x, new_end_y)]
+    translated_segment = [(new_start_x, new_start_y), (new_end_x, new_end_y)]
+    return translated_segment
 
 
 def get_edge_intersection_points(edge, polygon):
@@ -317,17 +321,20 @@ class Dcel:
         self.edges = []
         self.outer_face = OuterFace()
 
-    def build_dcel(self, points, segments):
-        self.__add_points(points)
+    def build_dcel(self, graph):
+        vertices, segments = get_translated_vertices_segments(graph)
+        self.__add_points(vertices)
         self.__add_edges_and_twins(segments)
         self.__add_next_and_previous_pointers()
         self.__add_face_pointers()
-        self.__create_outer_face(points)
+        self.__create_outer_face(vertices)
         self.__set_polygons()
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
         self.__set_face_tags()
         self.__set_edge_tags()
+        self.__set_adjacent_faces()
+        self.__set_junctions_curves()
 
     def build_dcel_primary(self, points, segments):
         self.__add_points(points)
@@ -344,36 +351,51 @@ class Dcel:
             else:
                 edge.tag = BOUNDARY
 
-    def __set_face_tags(self):
-        edges = list(self.graph.edges)
-        for edge in edges:
-            # for e in self.edges:
-            #     if e.origin.x == edge[0][0] and e.origin.y == edge[0][1] and e.destination.x == edge[1][0] and e.destination.y == edge[1][1]:
-            #         e.tag = ROAD_SEPARATOR
-            #         break
-            translated_edges = [translate_segment(edge, 0.5), translate_segment(edge, 0.5, True)]
-            midpoints = [((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2) for edge in translated_edges]
-            for midpoint in midpoints:
-                face = self.get_face_for_point(midpoint)
-                face.tag = ROAD
-                face.road_separator = get_edge_intersection_points(edge, face.polygon)
-                face.lane_separators.append(get_edge_intersection_points(translate_segment(edge, 0.5), face.polygon))
-                face.lane_separators.append(get_edge_intersection_points(translate_segment(edge, 0.5, True), face.polygon))
+    def __set_adjacent_faces(self):
+        for face in self.faces:
+            face.adjacent_faces = face.get_adjacent_faces()
 
-                face.lane_curves.append(get_edge_intersection_points(translate_segment(edge, 0.25), face.polygon))
-                face.lane_curves.append(get_edge_intersection_points(translate_segment(edge, 0.75), face.polygon))
-                face.lane_curves.append(
-                    get_edge_intersection_points(translate_segment(edge, 0.25, True), face.polygon))
-                face.lane_curves.append(
-                    get_edge_intersection_points(translate_segment(edge, 0.75, True), face.polygon))
+    def __set_face_tags(self):
+        edges = list(self.graph.to_undirected().edges)
+        for edge in edges:
+
+            midpoint = ((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
+
+            face = self.get_face_for_point(midpoint)
+            if face is None:
+                print("None face encountered in __set_face_tags method for edge ", edge)
+                continue
+            face.tag = ROAD
+            face.road_separator = get_edge_intersection_points(edge, face.polygon)
+
+            lane_width = self.graph.get_edge_data(edge[0], edge[1])['lane_width']
+
+            face.lane_separators.append(
+                get_edge_intersection_points(translate_segment(edge, 0.5 * lane_width), face.polygon))
+            face.lane_separators.append(
+                get_edge_intersection_points(translate_segment(edge, 0.5 * lane_width, True), face.polygon))
+
+            face.lane_curves.append(
+                get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width), face.polygon))
+            face.lane_curves.append(
+                get_edge_intersection_points(translate_segment(edge, 0.25 * lane_width), face.polygon))
+            face.lane_curves.append(
+                get_edge_intersection_points(translate_segment(edge, 0.25 * lane_width, True), face.polygon))
+            face.lane_curves.append(
+                get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width, True), face.polygon))
 
         nodes = [node for node in self.graph.nodes if self.graph.degree(node) > 4]
         for node in nodes:
-            self.get_face_for_point(node).tag = JUNCTION
+            face = self.get_face_for_point(node)
+            if face is None:
+                print("None face encountered in __set_face_tags method at the end")
+                continue
+            face.tag = JUNCTION
 
     def __set_polygons(self):
         for face in self.faces:
             vertices = face.get_face_vertices()
+            # print(vertices)
             face.polygon = Polygon(list(vertices))
 
     def show_dcel(self):
@@ -405,62 +427,68 @@ class Dcel:
         #     plt.scatter(vertex[0], vertex[1])
         plt.show()
 
-    def show_road_network(self):
+    def show_road_network(self, axis=None):
         fig, ax = plt.subplots()
+        if axis is not None:
+            ax = axis
         for face in self.faces:
             if face.tag in [ROAD, JUNCTION]:
                 x, y = face.polygon.exterior.xy
                 # Plot the polygon and fill it with grey color
-                # ax.text(x[0], y[0], face.name, fontsize=6, color='black')
                 ax.fill(x, y, color='grey', alpha=0.5, edgecolor='none')
-            if face.tag == ROAD:
-                x = [face.road_separator[0][0], face.road_separator[1][0]]
-                y = [face.road_separator[0][1], face.road_separator[1][1]]
-                ax.plot(x, y, color='black', linewidth=0.5)
 
-                x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
-                y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-                ax.plot(x, y, color='white', linewidth=0.5, linestyle='--')
+            try:
+                if face.tag == ROAD:
+                    x = [face.road_separator[0][0], face.road_separator[1][0]]
+                    y = [face.road_separator[0][1], face.road_separator[1][1]]
+                    ax.plot(x, y, color='black')
 
-                x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
-                y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-                ax.plot(x, y, color='white', linewidth=0.5, linestyle='--')
+                    # x_, y_ = face.polygon.centroid.x, face.polygon.centroid.y
+                    # ax.text(x_, y_, face.name)
 
-                x = [face.lane_curves[0][0][0], face.lane_curves[0][1][0]]
-                y = [face.lane_curves[0][0][1], face.lane_curves[0][1][1]]
-                ax.plot(x, y, color='blue', linewidth=0.5)
+                    x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
+                    y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
+                    ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
 
-                x = [face.lane_curves[1][0][0], face.lane_curves[1][1][0]]
-                y = [face.lane_curves[1][0][1], face.lane_curves[1][1][1]]
-                ax.plot(x, y, color='blue', linewidth=0.5)
+                    x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
+                    y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
+                    ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
 
-                x = [face.lane_curves[2][0][0], face.lane_curves[2][1][0]]
-                y = [face.lane_curves[2][0][1], face.lane_curves[2][1][1]]
-                ax.plot(x, y, color='blue', linewidth=0.5)
+                    font_size = 6
+                if face.tag in [ROAD, JUNCTION]:
+                    for i in range(len(face.lane_curves)):
+                        x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
+                        y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
 
-                x = [face.lane_curves[3][0][0], face.lane_curves[3][1][0]]
-                y = [face.lane_curves[3][0][1], face.lane_curves[3][1][1]]
-                ax.plot(x, y, color='blue', linewidth=0.5)
+                        # ax.scatter(x[0], y[0], s=font_size)
+                        # ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+                        #
+                        # ax.scatter(x[1], y[1], s=font_size)
+                        # ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
+                        ax.plot(x, y, color='blue', linewidth=0.5)
+
+            except Exception as e:
+                print(e, "face: ", face.name, face, "\n---- in show_road_network")
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
             x = [edge.origin.x, edge.destination.x]
             y = [edge.origin.y, edge.destination.y]
             ax.plot(x, y, color='black')
 
+            # ax.scatter(x[0], y[0], s=font_size)
+            # ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+            # ax.scatter(x[1], y[1], s=font_size)
+            # ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+
         partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
         for edge in partition_edges:
             x = [edge.origin.x, edge.destination.x]
             y = [edge.origin.y, edge.destination.y]
-            ax.plot(x, y, color='white', linewidth=0.5)
+            ax.plot(x, y, color='white', linewidth=0.2)
 
-        # road_separator_edges = [edge for edge in self.edges if edge.tag == ROAD_SEPARATOR]
-        # for edge in road_separator_edges:
-        #     x = [edge.origin.x, edge.destination.x]
-        #     y = [edge.origin.y, edge.destination.y]
-        #     ax.plot(x, y, color='black', linewidth=0.5)
-
-        plt.show(block=True)
+        ax.axis("equal")
+        plt.show()
 
     def get_face_for_point(self, point):
         point = Point(point[0], point[1])
@@ -582,16 +610,19 @@ class Dcel:
                 h = hedge
                 while h.next != hedge:  # Walk through all hedges of the cycle and set incident face
                     h.incident_face = f
-                    #h.twin.incident_face = f
+                    # h.twin.incident_face = f
                     h = h.next
                     vertex_list.append((h.origin.x, h.origin.y))
                 h.incident_face = f
-                #h.twin.incident_face = f
+                # h.twin.incident_face = f
 
                 self.faces.append(f)
 
                 # Calculate area of face formed by the half-edges
-                polygon = Polygon(vertex_list)
+                try:
+                    polygon = Polygon(vertex_list)
+                except Exception as e:
+                    print(vertex_list)
                 if polygon.area > max_face_area:  # Find largest face
                     max_face_area = polygon.area
                     max_face = f
@@ -633,7 +664,7 @@ class Dcel:
                     elif face2.polygon.within(face1.polygon) and face1 != face2:
                         face1.faces_inside.append(face2)
                 except Exception as e:
-                    print(face1, face2)
+                    print(face1.name, face2.name)
                     print(face1.get_face_vertices())
                     print(face2.get_face_vertices())
                     print(e)
@@ -656,7 +687,7 @@ class Dcel:
             if not hedge.visited:
                 h = hedge
                 h.visited = True
-                while h.direction == CLOCKWISE and h.next != hedge:  # Walk through all hedges of the cycle and set incident face
+                while h.direction == CLOCKWISE and h.next != hedge:
                     if h.incident_face is not None:
                         if h.incident_face.parent is None:
                             self.faces.remove(h.incident_face)
@@ -669,3 +700,183 @@ class Dcel:
                     h.incident_face = h.incident_face.parent
 
             # hedge.incident_face.outer_component = hedge
+
+    def __set_junctions_curves(self):
+
+        def find_closest_lane_curve(target_lane_curve, lane_curves_list):
+            min_distance = float('inf')
+            closest_lane_curve = None
+            closest_face = None
+            index = None
+
+            for item in lane_curves_list:
+                lane_curve = item[2]
+                distance = target_lane_curve.distance(LineString(lane_curve))
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_lane_curve = lane_curve
+                    closest_face = item[0]
+                    index = item[1]
+
+            return closest_lane_curve, closest_face, index
+
+        def find_closest_point(lane_curve, polygon):
+            min_distance = float('inf')
+            closest_point = None
+
+            for point in list(lane_curve.coords):
+                distance = Point(point).distance(polygon)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_point = point
+
+            return closest_point
+
+        # visited_faces = []
+
+        for face in self.faces:
+            if face.tag == JUNCTION:
+                for i in range(len(face.adjacent_faces)):
+                    first_face = face.adjacent_faces[i]
+                    # visited_faces.append(first_face)
+                    potential_curves = []
+                    for adj_face in face.adjacent_faces:
+                        if adj_face != first_face:
+                            potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
+                            potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
+
+                    current_curve = first_face.lane_curves[0]
+                    master_curve = current_curve
+                    for _ in range(len(face.adjacent_faces)-1):
+
+                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve), potential_curves)
+                        # if closest_face in visited_faces:
+                        #     continue
+                        next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
+
+                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
+                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(master_curve, closest_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
+                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+
+
+                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[1]), face.polygon)
+                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[1], closest_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[1]), face.polygon)
+                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[1], next_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+
+                        current_curve = closest_face.lane_curves[3] if index == 0 else closest_face.lane_curves[0]
+
+                        potential_curves.clear()
+                        for adj_face in face.adjacent_faces:
+                            if adj_face != closest_face:
+                                potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
+                                potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    potential_curves.clear()
+                    for adj_face in face.adjacent_faces:
+                        if adj_face != first_face:
+                            potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
+                            potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
+
+                    current_curve = first_face.lane_curves[3]
+                    master_curve = current_curve
+                    for _ in range(len(face.adjacent_faces) - 1):
+                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve),
+                                                                                     potential_curves)
+                        next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
+
+                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
+                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(master_curve, closest_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
+                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
+                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[2], closest_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
+                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
+
+                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[2], next_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
+
+                        current_curve = closest_face.lane_curves[3] if index == 0 else closest_face.lane_curves[0]
+
+                        potential_curves.clear()
+                        for adj_face in face.adjacent_faces:
+                            if adj_face != closest_face:
+                                potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
+                                potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
