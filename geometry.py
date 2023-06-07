@@ -130,11 +130,12 @@ def get_euclidean_distance(point1, point2):
         """
     return math.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2)
 
+
 def rearrange_line_strings(line1, line2):
     # Calculate the distances between the second point of line1 and the first point of line2
     p1 = Point(line1.coords[0])
     p2 = Point(line2.coords[0])
-    min_dis = 999999999
+    min_dis = float('inf')
     distance1 = Point(line1.coords[0]).distance(Point(line2.coords[0]))
     if min_dis > distance1:
         p1 = Point(line1.coords[0])
@@ -233,20 +234,20 @@ def keep_in_limit(vector, limit):
     return vector
 
 
-l1 = [(460, -2), (338, 71)]
-l2 = [(317, 71), (226, 26)]
-x = [l1[0][0], l1[1][0]]
-y = [l1[0][1], l1[1][1]]
-plt.plot(x, y)
-
-x = [l2[0][0], l2[1][0]]
-y = [l2[0][1], l2[1][1]]
-plt.plot(x, y)
-
-curve = get_interpolated_curve(l1, l2)
-x = [curve[i][0] for i in range(len(curve))]
-y = [curve[i][1] for i in range(len(curve))]
-
-plt.plot(x, y)
-plt.show()
-
+# l1 = [(460, -2), (338, 71)]
+# l2 = [(317, 71), (226, 26)]
+# x = [l1[0][0], l1[1][0]]
+# y = [l1[0][1], l1[1][1]]
+# plt.plot(x, y)
+#
+# x = [l2[0][0], l2[1][0]]
+# y = [l2[0][1], l2[1][1]]
+# plt.plot(x, y)
+#
+# curve = get_interpolated_curve(l1, l2)
+# x = [curve[i][0] for i in range(len(curve))]
+# y = [curve[i][1] for i in range(len(curve))]
+#
+# plt.plot(x, y)
+# plt.show()
+#

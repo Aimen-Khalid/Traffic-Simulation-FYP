@@ -3,7 +3,7 @@ from shapely import Point, LineString
 import files_functions
 import networkx as nx
 from rtree import index
-import geometry_functions
+import geometry
 import matplotlib.pyplot as plt
 
 
@@ -101,8 +101,8 @@ def graph_to_lanes(graph):
                 segment4 = translated_segments_cw[len(edges) - 1]
             else:
                 segment4 = translated_segments_cw[i - 1]
-            cw_start = tuple(geometry_functions.get_intersection_point(segment1, segment2))
-            acw_start = tuple(geometry_functions.get_intersection_point(segment3, segment4))
+            cw_start = tuple(geometry.get_intersection_point(segment1, segment2))
+            acw_start = tuple(geometry.get_intersection_point(segment3, segment4))
             if graph.get_edge_data(edge[0], edge[1])['cw_start'] is None:
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
                 nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})

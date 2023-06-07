@@ -2,18 +2,28 @@
 from math import radians
 import math
 import matplotlib.pyplot as plt
-import geometry_functions
+import geometry
 from math import cos, sin, radians
 from point import ScaledPoint
 from shapely import Point, LineString
+from shapely.ops import nearest_points
+
 
 # constants
-dt = 0.01
-D_PER_ACC_WEIGHT = 20
-P_PER_ACC_WEIGHT = 10
-P_PARALLEL_DEC_WEIGHT = 10
-P_PARALLEL_ACC_WEIGHT = 0.2
-angle_threshold = 5
+params = {
+    "dt": 0.01,
+    "D_PER_ACC_WEIGHT": 20,
+    "P_PER_ACC_WEIGHT": 10,
+    "P_PARALLEL_DEC_WEIGHT": 10,
+    "P_PARALLEL_ACC_WEIGHT": 0.2,
+    "angle_threshold": 5
+}
+# dt = 0.01
+# D_PER_ACC_WEIGHT = 20
+# P_PER_ACC_WEIGHT = 10
+# P_PARALLEL_DEC_WEIGHT = 10
+# P_PARALLEL_ACC_WEIGHT = 0.2
+# angle_threshold = 5
 
 
 class Vehicle:
@@ -22,6 +32,7 @@ class Vehicle:
 
         # parameters
         self.lookahead_distance = 10
+        self.angle_threshold = params["angle_threshold"]
         self.initial_speed = velocity.norm()
         self.length = length
         self.width = width
@@ -36,7 +47,7 @@ class Vehicle:
         self.angle = angle
         self.velocity = velocity
         self.perpendicular_acc = acceleration
-        self.parallel_acc = geometry_functions.get_vector(0, 0)
+        self.parallel_acc = geometry.get_vector(0, 0)
         self.lookahead_angle = 0
         self.error = 0
         self.prev_error = 0
@@ -52,7 +63,7 @@ class Vehicle:
         dir_vect = dir_vect * (self.length / 2)
 
         # orthogonal_vector starts from vehicle centroid and ends at the mid-point of the side line of vehicle
-        orthogonal_vector = geometry_functions.get_orthogonal_unit_vector(dir_vect)
+        orthogonal_vector = geometry.get_orthogonal_unit_vector(dir_vect)
         orthogonal_vector = ScaledPoint(orthogonal_vector.get_x() * self.width / 2,
                                         orthogonal_vector.get_y() * self.width / 2)
 
@@ -67,34 +78,36 @@ class Vehicle:
         proportional_error = self.error
         derivative_error = self.error - self.prev_error
 
-        perp_acc_magnitude = (P_PER_ACC_WEIGHT * proportional_error) + (D_PER_ACC_WEIGHT * derivative_error)
+        perp_acc_magnitude = (params["P_PER_ACC_WEIGHT"] * proportional_error) + (params["D_PER_ACC_WEIGHT"] * derivative_error)
 
-        self.perpendicular_acc = geometry_functions.get_vector(self.theta + (self.angle * 180 / math.pi),
+        self.perpendicular_acc = geometry.get_vector(self.theta + (self.angle * 180 / math.pi),
                                                                perp_acc_magnitude)
-        self.perpendicular_acc = geometry_functions.keep_in_limit(self.perpendicular_acc, self.acc_limit)
+        self.perpendicular_acc = geometry.keep_in_limit(self.perpendicular_acc, self.acc_limit)
 
         if self.velocity.norm() >= self.goal_speed:
-            self.perpendicular_acc = geometry_functions.get_vector(0, 0)
+            self.perpendicular_acc = geometry.get_vector(0, 0)
 
     def set_parallel_acc(self):
-        if abs(self.lookahead_angle) > radians(angle_threshold):
-            dec_magnitude = self.lookahead_angle - math.radians(angle_threshold)
-            self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude * (-P_PARALLEL_DEC_WEIGHT)
+        if abs(self.lookahead_angle) > radians(params["angle_threshold"]):
+            dec_magnitude = self.lookahead_angle - radians(params["angle_threshold"])
+            self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude * (-params["P_PARALLEL_DEC_WEIGHT"])
         else:
             self.parallel_acc = (self.velocity / self.velocity.norm()) * (
-                    P_PARALLEL_ACC_WEIGHT * (self.goal_speed - self.velocity.norm()))
-        self.parallel_acc = geometry_functions.keep_in_limit(self.parallel_acc, self.acc_limit)
+                    params["P_PARALLEL_ACC_WEIGHT"] * (self.goal_speed - self.velocity.norm()))
+        self.parallel_acc = geometry.keep_in_limit(self.parallel_acc, self.acc_limit)
 
     def controller(self):
         self.set_perpendicular_acc()
         self.set_parallel_acc()
-        return self.perpendicular_acc + self.parallel_acc
+        resultant_acc = self.perpendicular_acc + self.parallel_acc
+        return geometry.keep_in_limit(resultant_acc, self.acc_limit)
 
     def update_state_vars(self):
+        self.error = self.get_error_ang_disp()
         acc = self.controller()
-        self.velocity += (acc * dt)
-        self.velocity = geometry_functions.keep_in_limit(self.velocity, self.speed_limit)
-        self.centroid += self.velocity * dt
+        self.velocity += (acc * params["dt"])
+        self.velocity = geometry.keep_in_limit(self.velocity, self.speed_limit)
+        self.centroid += self.velocity * params["dt"]
         self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
 
     def get_xy_lists(self):
@@ -123,7 +136,24 @@ class Vehicle:
         projected_point_distance = self.reference_track.project(vehicle_point)
         closest_point = self.reference_track.interpolate(projected_point_distance)
         lookahead_point = self.reference_track.interpolate(projected_point_distance + self.lookahead_distance)
-        return {"closest_point": closest_point, "lookahead_point": lookahead_point}
+        # return {"closest_point": closest_point, "lookahead_point": lookahead_point}
+        return {"closest_point": closest_point, "lookahead_point": self.get_lookahead_point()}
+
+    def get_lookahead_point(self):
+        circle_center = Point(self.centroid.get_x(), self.centroid.get_y())
+        circle_radius = self.lookahead_distance
+        vel_vector = Point(self.velocity.get_x(), self.velocity.get_y())
+        circle = Point(circle_center).buffer(circle_radius)  # Create a circle geometry
+        boundary = circle.boundary  # Get the boundary of the circle
+        intersection = boundary.intersection(self.reference_track)  # Find the intersection points
+        if intersection.is_empty:
+            return None  # No intersection point
+        vel_vector = Point(vel_vector.x + circle_center.x, vel_vector.y + circle_center.y)
+        # If multiple intersection points exist, find the one closest to the circle center
+        if intersection.geom_type == 'MultiPoint':
+            intersection = nearest_points(vel_vector, intersection)[1]
+
+        return intersection
 
     def get_track_segment(self):
         """

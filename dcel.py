@@ -4,7 +4,7 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from geometry_functions import get_intersection_point, get_interpolated_curve
+from geometry import get_intersection_point, get_interpolated_curve
 from graph_to_road_network import get_translated_vertices_segments
 
 CLOCKWISE = 0  # outside edges
@@ -117,11 +117,8 @@ class HalfEdge:
     def get_angle(self):
         dx = self.destination.x - self.origin.x
         dy = self.destination.y - self.origin.y
-        l = m.sqrt(dx * dx + dy * dy)
-        if dy > 0:
-            return m.acos(dx / l)
-        else:
-            return 2 * m.pi - m.acos(dx / l)
+        length = m.sqrt(dx * dx + dy * dy)
+        return m.acos(dx / length) if dy > 0 else 2 * m.pi - m.acos(dx / length)
 
 
 class Edge:
@@ -747,9 +744,10 @@ class Dcel:
 
                     current_curve = first_face.lane_curves[0]
                     master_curve = current_curve
-                    for _ in range(len(face.adjacent_faces)-1):
+                    for _ in range(len(face.adjacent_faces) - 1):
 
-                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve), potential_curves)
+                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve),
+                                                                                     potential_curves)
                         # if closest_face in visited_faces:
                         #     continue
                         next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
@@ -768,8 +766,6 @@ class Dcel:
                         # face.lane_curves.append(interpolated_curve)
                         face.lane_curves.append([closest_point1, closest_point2])
 
-
-
                         closest_point1 = find_closest_point(LineString(first_face.lane_curves[1]), face.polygon)
                         closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
 
@@ -784,7 +780,6 @@ class Dcel:
                         # face.lane_curves.append(interpolated_curve)
                         face.lane_curves.append([closest_point1, closest_point2])
 
-
                         current_curve = closest_face.lane_curves[3] if index == 0 else closest_face.lane_curves[0]
 
                         potential_curves.clear()
@@ -792,25 +787,6 @@ class Dcel:
                             if adj_face != closest_face:
                                 potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
                                 potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
                     potential_curves.clear()
                     for adj_face in face.adjacent_faces:
@@ -860,23 +836,3 @@ class Dcel:
                             if adj_face != closest_face:
                                 potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
                                 potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
