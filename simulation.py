@@ -88,8 +88,9 @@ def compute_parameters1(road_network, vehicle, frames):  # face mid-point approa
             # Find the two closest intersection points of the vehicle's current face
             intersection_points_list = vehicle.get_closest_intersection_points()
             # Compute the midpoint of the two intersection points as the current face midpoint
-            vehicle.face_mid_point = geometry_functions.get_mid_point([(intersection_points_list[0][0], intersection_points_list[0][1]),
-                                                    (intersection_points_list[1][0], intersection_points_list[1][1])])
+            vehicle.face_mid_point = geometry_functions.get_mid_point(
+                [(intersection_points_list[0][0], intersection_points_list[0][1]),
+                 (intersection_points_list[1][0], intersection_points_list[1][1])])
             vehicle.prev_error = vehicle.error
             # Compute the vehicle's current error
             vehicle.error = vehicle.get_error_midpoint_approach(intersection_points_list)
@@ -105,7 +106,7 @@ def compute_parameters1(road_network, vehicle, frames):  # face mid-point approa
     return parameters
 
 
-def compute_parameters(vehicle, road_network, frames):    # reference track approach
+def compute_parameters(vehicle, road_network, frames):  # reference track approach
     """
     Computes vehicle parameters for each frame of a simulation using the reference track approach.
 
@@ -139,7 +140,7 @@ def compute_parameters(vehicle, road_network, frames):    # reference track appr
     with tqdm(total=frames) as pbar:
         for _ in range(frames):
             # Get the current x and y coordinates of the vehicle's midpoint
-            vehicle_x, vehicle_y = vehicle.get_car_mid_point()
+            vehicle_x, vehicle_y = vehicle.get_vehicle_front_mid_point().x, vehicle.get_vehicle_front_mid_point().y
 
             # Add the current x and y coordinates to the trail list for visualization purposes
             parameters['trail_x'].append(vehicle_x)
@@ -154,16 +155,16 @@ def compute_parameters(vehicle, road_network, frames):    # reference track appr
 
             # Add additional text information to the plot for this frame
             text = (
-                f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
-                + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
-                + '\nframes: '
-                + str(_)
-                + '\nangle: '
-                + str(round(math.degrees(vehicle.error), 2)) + ' degrees'
-                + '\nspeed: '
-                + str(f'{round(vehicle.velocity.norm(), 2)}') + ' ms'
-                + '\nerror: '
-                + str(f'{round(vehicle.error, 2)}')
+                    f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
+                    + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
+                    + '\nframes: '
+                    + str(_)
+                    + '\nangle: '
+                    + str(round(math.degrees(vehicle.error), 2)) + ' degrees'
+                    + '\nspeed: '
+                    + str(f'{round(vehicle.velocity.norm(), 2)}') + ' ms'
+                    + '\nerror: '
+                    + str(f'{round(vehicle.error, 2)}')
             )
             parameters['text'].append(text)
 
@@ -184,7 +185,6 @@ def compute_parameters(vehicle, road_network, frames):    # reference track appr
             x = [vehicle_x, vehicle.parallel_acc.get_x() + vehicle_x]
             y = [vehicle_y, vehicle.parallel_acc.get_y() + vehicle_y]
             parameters['acc2'].append((x, y))
-
 
             # Add the magnitude of the vehicle's acceleration vector to the dictionary
             parameters['acc_magnitude'].append(vehicle.perpendicular_acc.norm())
@@ -253,7 +253,7 @@ def plot_parameters(vehicle, start, end):
     plt.show()
 
     fig.savefig(f"p{car.P_PER_ACC_WEIGHT} d {car.D_PER_ACC_WEIGHT} acc_lim {vehicle.acc_limit} "
-                    f"dist {vehicle.lookahead_distance} init_speed {round(vehicle.initial_speed, 2)} "
+                f"dist {vehicle.lookahead_distance} init_speed {round(vehicle.initial_speed, 2)} "
                 f"dec {car.P_PARALLEL_DEC_WEIGHT} threshold {car.angle_threshold}.png")
 
 
@@ -317,15 +317,15 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
     acc_line, = ax.plot([], [])
     acc2_line, = ax.plot([], [])
     velocity_line, = ax.plot([], [])
-    projected_point = ax.scatter([], [], color='red', s=5)
+    lookahead_point = ax.scatter([], [], color='red', s=5)
     closest_point = ax.scatter([], [], color='green', s=5)
-    text = ax.text(0, 0, vehicle.error, fontsize=6)
+    text = ax.text(0, 0, "", fontsize=6)
 
     headed_line, = ax.plot([], [])
     track_line, = ax.plot([], [])
 
     def init():
-        return vehicle_line, acc_line, acc2_line, velocity_line, projected_point, text, headed_line, track_line
+        return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, headed_line, track_line
 
     def animate(i):
         vehicle_line.set_data(parameters['vehicle'][i])
@@ -336,8 +336,10 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
 
         acc2_line.set_data(parameters['acc2'][i])
 
-        projected_point.set_offsets((parameters['projected_points'][i][1].x, parameters['projected_points'][i][1].y))
-        closest_point.set_offsets((parameters['projected_points'][i][0].x, parameters['projected_points'][i][0].y))
+        lookahead_point.set_offsets((parameters['projected_points'][i]["lookahead_point"].x,
+                                     parameters['projected_points'][i]["lookahead_point"].y))
+        closest_point.set_offsets((parameters['projected_points'][i]["closest_point"].x,
+                                   parameters['projected_points'][i]["closest_point"].y))
 
         start, end = parameters['headed_vector'][i]
         x = [start[0], end[0]]
@@ -351,14 +353,15 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
 
         window_size = 13
         # text.set_position((parameters['centroid'][i].get_x()-1.75*window_size, parameters['centroid'][i].get_y()))
-        text.set_position((-3, 50))
+        x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 10
+        y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid']))) / 2
+        text.set_position((x, y))
         text.set_text(parameters['text'][i])
 
         # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
         # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
 
-        # ax.set_xlim(2, 250)
-        # ax.set_ylim(2, 50)
+
 
         return vehicle_line, velocity_line, acc_line, acc2_line, text, trail_line, headed_line, track_line
 
@@ -392,4 +395,4 @@ def create_simulation_video(vehicle, road_network, frames):
 
     simulate(road_network, vehicle, frames=frames, parameters=parameters,
              file_name=f"p{car.P_PER_ACC_WEIGHT} d {car.D_PER_ACC_WEIGHT} acc_lim {vehicle.acc_limit} "
-                      f"dist {vehicle.lookahead_distance} init_speed {round(vehicle.initial_speed, 2)} dec {car.P_PARALLEL_DEC_WEIGHT} threshold {car.angle_threshold}.mp4")
+                       f"dist {vehicle.lookahead_distance} init_speed {round(vehicle.initial_speed, 2)} dec {car.P_PARALLEL_DEC_WEIGHT} threshold {car.angle_threshold}.mp4")

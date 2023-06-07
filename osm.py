@@ -6,29 +6,32 @@ import pandas as pd
 import os
 import tkinter as tk
 from tkinter import filedialog
+import webbrowser
+import time
 
-# Create the Tkinter root window
-root = tk.Tk()
 
-# Hide the root window
-root.withdraw()
+def get_coordinates_from_map():
+    m = folium.Map(location=[31.4756608, 74.3423600], zoom_start=16)
 
-# Open the file dialog
-file_path = filedialog.askopenfilename()
+    draw = Draw(export=True, filename='coordinates.geojson')
 
-# Check if a file was selected
-if file_path:
-    print("Selected file:", file_path)
-else:
-    print("No file selected")
+    draw.add_to(m)
 
-# Destroy the root window
-root.destroy()
+    m.save("map.html")
 
-m = folium.Map(location=[31.4756608, 74.3423600], zoom_start=16)
+    webbrowser.open("map.html")
 
-draw = Draw(export=True, filename='coordinates.geojson')
+    root = tk.Tk()
 
-draw.add_to(m)
+    root.withdraw()
 
-m.save("map.html")
+    file_path = filedialog.askopenfilename()
+    root.destroy()
+
+    with open(file_path, 'r') as file:
+        content = file.read()
+        data = json.loads(content)
+
+    coordinates = data['features'][0]['geometry']['coordinates'][0]
+    return coordinates
+

@@ -2,7 +2,7 @@ from shapely.geometry import LineString, Point
 from math import sqrt
 
 
-def calculate_accuracy_linestring(vehicle_coordinates, linestring):
+def calculate_tracking_accuracy(vehicle_coordinates, linestring):
     total_distance = 0.0
 
     # Convert the linestring to a Shapely LineString object
@@ -29,5 +29,5 @@ def calculate_accuracy_linestring(vehicle_coordinates, linestring):
 vehicle_coordinates = [(0, 0), (1, 1), (2, 2), (3, 3)]
 linestring = [(0, 0), (1, 1), (2, 2), (3, 3)]
 
-accuracy = calculate_accuracy_linestring(vehicle_coordinates, linestring)
+accuracy = calculate_tracking_accuracy(vehicle_coordinates, linestring)
 print("Accuracy:", accuracy)
