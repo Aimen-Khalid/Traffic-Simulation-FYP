@@ -1,19 +1,13 @@
-import math
 import dcel
 import car
 from point import ScaledPoint
 import matplotlib.pyplot as plt
-import numpy as np
-import time
 from shapely import Point, LineString
 import networkx as nx
-import geometry
 import files_functions
 import simulation
 from graph_to_road_network import show_graph_lanes
 from drawing_tool import draw_and_save_road_network_graph, get_vertices_and_segments
-import osm
-from geometry import get_interpolated_curve
 
 """
 Head over to this link to understand the terms used in this project:
@@ -85,7 +79,7 @@ def road_network_main():
 
 
 def simulation_main():
-    frames = 500
+    frames = 1500
     track = create_track()
     vehicle = car.Vehicle(length=1, width=0.5, centroid=ScaledPoint(track.coords[1][0], track.coords[1][1]),
                           angle=90, velocity=ScaledPoint(6, 0), acceleration=ScaledPoint(0, 0), reference_track=track)

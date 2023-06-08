@@ -5,6 +5,8 @@ from math import sqrt
 class ScaledPoint:
     def __init__(self, x, y):
         self.point = Point(x, y)
+        self.x = x
+        self.y = y
 
     def __mul__(self, s):
         return ScaledPoint(self.point.x * s, self.point.y * s)

@@ -31,3 +31,4 @@ linestring = [(0, 0), (1, 1), (2, 2), (3, 3)]
 
 accuracy = calculate_tracking_accuracy(vehicle_coordinates, linestring)
 print("Accuracy:", accuracy)
+

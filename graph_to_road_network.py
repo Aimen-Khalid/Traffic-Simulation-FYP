@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 def translate_segment(segment, length, anticlockwise=False):
     if anticlockwise:
         length = -1 * length
-    # Extract the starting and ending points of the segment
     start, end = segment
 
     start = Point(start[0], start[1])
@@ -19,10 +18,7 @@ def translate_segment(segment, length, anticlockwise=False):
     dx = end.x - start.x
     dy = end.y - start.y
 
-    # Compute the length of the vector
     vector_length = ((dx ** 2) + (dy ** 2)) ** 0.5
-    if vector_length == 0:
-        vector_length = 1
     # Compute the cosine and sine of the angle between the vector and the x-axis
     cos_theta = dx / vector_length
     sin_theta = dy / vector_length
@@ -39,9 +35,7 @@ def translate_segment(segment, length, anticlockwise=False):
 
 def get_angle(edge):
     """Calculate the angle the edge makes with x-axis, in radians.
-
     :param edge: a tuple containing the coordinates of the edge's endpoints
-
     :return: the angle of the edge, in radians
     """
     origin, destination = edge[0], edge[1]
@@ -63,50 +57,48 @@ def get_edges_cw(graph, node):
     return outgoing_edges
 
 
-def graph_to_lanes(graph):
-    vertices = []
-    segments = []
-    partitions = []
+def set_edge_attribute(graph, edge, atr_name, atr_value):
+    nx.set_edge_attributes(graph, {
+        (edge[0], edge[1]): {atr_name: atr_value}})
 
-    for node in graph.nodes:
-        if graph.degree(node) == 2:
-            outgoing_edge = list(graph.edges(node))[0]
 
-            if not graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start']:
-                cw_start = translate_segment(outgoing_edge, graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['lane_width'])[0]
-                acw_start = translate_segment(outgoing_edge, graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['lane_width'], anticlockwise=True)[0]
-                if graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is None:
-                    nx.set_edge_attributes(graph, {
-                        (outgoing_edge[0], outgoing_edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
-                    nx.set_edge_attributes(graph, {
-                        (outgoing_edge[1], outgoing_edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
-            continue
-        translated_segments_cw = []
-        translated_segments_acw = []
+def get_edge_attribute(graph, edge, atr_name):
+    return graph.get_edge_data(edge[0], edge[1])[atr_name]
 
-        edges = get_edges_cw(graph, node)
-        for edge in edges:
-            nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'visited': False}})
-            translated_segments_cw.append(translate_segment(edge, graph.get_edge_data(edge[0], edge[1])['lane_width']))
-            translated_segments_acw.append(translate_segment(edge, graph.get_edge_data(edge[0], edge[1])['lane_width'], anticlockwise=True))
 
-        for i, edge in enumerate(edges):
-            if i + 1 == len(edges):
-                segment1 = translated_segments_acw[0]
-            else:
-                segment1 = translated_segments_acw[i + 1]
-            segment2 = translated_segments_cw[i]
-            segment3 = translated_segments_acw[i]
-            if i == 0:
-                segment4 = translated_segments_cw[len(edges) - 1]
-            else:
-                segment4 = translated_segments_cw[i - 1]
-            cw_start = tuple(geometry.get_intersection_point(segment1, segment2))
-            acw_start = tuple(geometry.get_intersection_point(segment3, segment4))
-            if graph.get_edge_data(edge[0], edge[1])['cw_start'] is None:
-                nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
-                nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
-            # vertices.extend((cw_start, acw_start))
+def set_edge2_translated_points(graph, outgoing_edge):
+    if graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is not None:
+        return
+    cw_start = translate_segment(outgoing_edge, geometry.lane_width)[0]
+    acw_start = translate_segment(outgoing_edge, geometry.lane_width, anticlockwise=True)[0]
+    if graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is None:
+
+        nx.set_edge_attributes(graph, {
+            (outgoing_edge[0], outgoing_edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
+        nx.set_edge_attributes(graph, {
+            (outgoing_edge[1], outgoing_edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
+
+
+def set_edges_translated_points(graph, edges, translated_segments_cw, translated_segments_acw):
+    for i, edge in enumerate(edges):
+        if i + 1 == len(edges):
+            segment1 = translated_segments_acw[0]
+        else:
+            segment1 = translated_segments_acw[i + 1]
+        segment2 = translated_segments_cw[i]
+        segment3 = translated_segments_acw[i]
+        if i == 0:
+            segment4 = translated_segments_cw[len(edges) - 1]
+        else:
+            segment4 = translated_segments_cw[i - 1]
+        cw_start = tuple(geometry.get_intersection_point(segment1, segment2))
+        acw_start = tuple(geometry.get_intersection_point(segment3, segment4))
+        if graph.get_edge_data(edge[0], edge[1])['cw_start'] is None:
+            nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
+            nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
+
+
+def set_remaining_edges_translated_points(graph):
     for node in graph.nodes:
         edges = get_edges_cw(graph, node)
         for edge in edges:
@@ -114,8 +106,8 @@ def graph_to_lanes(graph):
                 continue
             neighbor_edges = get_edges_cw(graph, edge[1])
             if len(neighbor_edges) == 1:
-                cw_end = translate_segment(edge, graph.get_edge_data(edge[0], edge[1])['lane_width'])[1]
-                acw_end = translate_segment(edge, graph.get_edge_data(edge[0], edge[1])['lane_width'], anticlockwise=True)[1]
+                cw_end = translate_segment(edge, geometry.lane_width)[1]
+                acw_end = translate_segment(edge, geometry.lane_width, anticlockwise=True)[1]
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
                 nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
                 continue
@@ -127,8 +119,9 @@ def graph_to_lanes(graph):
             if graph.get_edge_data(edge[0], edge[1])['cw_end'] is None:
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
                 nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
-            # vertices.extend((cw_end, acw_end))
 
+
+def populate_translated_lists(graph, translated_segments, translated_vertices, partitions):
     for node in graph.nodes:
         edges = get_edges_cw(graph, node)
         for edge in edges:
@@ -136,7 +129,7 @@ def graph_to_lanes(graph):
                 continue
             nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'visited': True}})
             nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'visited': True}})
-            segments.extend(
+            translated_segments.extend(
                 (
                     [
                         (graph.get_edge_data(edge[0], edge[1])['cw_start']),
@@ -148,14 +141,12 @@ def graph_to_lanes(graph):
                     ],
                 )
             )
-            vertices.extend(
+            translated_vertices.extend(
                 (
                     (graph.get_edge_data(edge[0], edge[1])['cw_start']),
                     (graph.get_edge_data(edge[0], edge[1])['cw_end']),
                     (graph.get_edge_data(edge[0], edge[1])['acw_start']),
                     (graph.get_edge_data(edge[0], edge[1])['acw_end']),
-                    # (edge[0]),
-                    # (edge[1])
                 )
             )
             partitions.extend(
@@ -169,10 +160,34 @@ def graph_to_lanes(graph):
                         (graph.get_edge_data(edge[0], edge[1])['acw_end']),
                     ],)
             )
+    partitions = {frozenset(segment) for segment in partitions}
+    partitions = [list(segment) for segment in partitions]
 
-    unique_partitions = {frozenset(segment) for segment in partitions}
-    unique_partitions = [list(segment) for segment in unique_partitions]
-    return vertices, segments, unique_partitions
+
+def graph_to_lanes(graph):
+    translated_vertices = []
+    translated_segments = []
+    partitions = []
+
+    for node in graph.nodes:
+        if graph.degree(node) == 2:
+            outgoing_edge = list(graph.edges(node))[0]
+            set_edge2_translated_points(graph, outgoing_edge)
+        else:
+            translated_segments_cw = []
+            translated_segments_acw = []
+
+            edges = get_edges_cw(graph, node)
+            for edge in edges:
+                nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'visited': False}})
+                translated_segments_cw.append(translate_segment(edge, geometry.lane_width))
+                translated_segments_acw.append(translate_segment(edge, geometry.lane_width, anticlockwise=True))
+
+            set_edges_translated_points(graph, edges, translated_segments_cw, translated_segments_acw)
+
+    set_remaining_edges_translated_points(graph)
+    populate_translated_lists(graph, translated_segments, translated_vertices, partitions)
+    return translated_vertices, translated_segments, partitions
 
 
 def plot_segments(segments, color, ax):
@@ -188,7 +203,6 @@ def plot_segments(segments, color, ax):
 def show_graph_lanes(graph):
     base_edges = graph.to_undirected().edges
     translated_vertices, translated_segments, partition_edges = graph_to_lanes(graph)
-
     fig, ax = plt.subplots()
 
     plot_segments(translated_segments, "green", ax)
@@ -201,7 +215,9 @@ def show_graph_lanes(graph):
 
 def get_translated_vertices_segments(graph):
     vertices, segments, partitions = graph_to_lanes(graph)
+    # remove duplicates from partitions list
     unique_partitions = {frozenset(segment) for segment in partitions}
+    # Re-cast partitions to list
     unique_partitions = [list(segment) for segment in unique_partitions]
     segments.extend(unique_partitions)
     return vertices, segments

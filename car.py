@@ -139,10 +139,14 @@ class Vehicle:
     def set_orientation(self):
         self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
 
+    def set_prev_error(self):
+        self.prev_error = self.error
+
     def update_state_vars(self):
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
         self.set_lookahead_point()
+        self.set_prev_error()
         self.set_error()
         self.set_velocity()
         self.set_centroid()
@@ -203,3 +207,11 @@ class Vehicle:
     def set_current_face(self, road_network):
         vehicle_x, vehicle_y = self.front_mid_point.x, self.front_mid_point.y
         self.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
+
+    def get_vectors(self):
+        vehicle_point = (self.front_mid_point.x, self.front_mid_point.y)
+        headed_direction = (
+            vehicle_point, (self.velocity.get_x() + vehicle_point[0], self.velocity.get_y() + vehicle_point[1]))
+        lookahead_point = (self.front_mid_point.x, self.front_mid_point.y)
+        track_direction = (vehicle_point, lookahead_point)
+        return headed_direction, track_direction
