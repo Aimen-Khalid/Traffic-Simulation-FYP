@@ -61,7 +61,7 @@ def create_own_road_network():
 
 
 def create_track():
-    file_name = "track2.txt"
+    file_name = "track.txt"
 
     # track, _ = get_vertices_and_segments()
     # files_functions.write_vertices_to_file(track, file_name)
@@ -77,13 +77,13 @@ def road_network_main():
     # area_name = input("Name the area that lies within the selected coordinates: ")
     # create_own_road_network()
     # show_road_network(coordinates, area_name)
-    show_saved_road_network("Bahria")
+    show_saved_road_network("test")
 
 
 def simulation_main():
-    frames = 2500
+    frames = 3500
     track = create_track()
-    vehicle = car.Vehicle(length=1, width=0.5, centroid=ScaledPoint(track.coords[0][0], track.coords[0][1]),
+    vehicle = car.Vehicle(length=3, width=1.5, centroid=ScaledPoint(track.coords[1][0], track.coords[1][1]),
                           angle=90, velocity=ScaledPoint(6, 0), acceleration=ScaledPoint(0, 0), reference_track=track)
     road_network = get_saved_road_network("Bahria")
     simulation.create_simulation_video(vehicle, road_network, frames)

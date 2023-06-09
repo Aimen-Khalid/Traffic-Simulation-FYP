@@ -229,11 +229,11 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         track_line.set_data(x, y)
 
         window_size = 13
-        text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
-        x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 15
-        y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid']))) / 2
-        text.set_position((x, y))
-        text.set_text(parameters['text'][i])
+        # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
+        # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 15
+        # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid']))) / 2
+        # text.set_position((x, y))
+        # text.set_text(parameters['text'][i])
 
         # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
         # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)

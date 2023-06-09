@@ -143,7 +143,7 @@ class Vehicle:
         self.prev_error = self.error
 
     def set_lookahead_distance(self):
-        t = 3
+        t = 1.5
         self.lookahead_distance = self.velocity.norm() * t
 
     def update_state_vars(self):
