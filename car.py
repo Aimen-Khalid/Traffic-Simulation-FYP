@@ -142,9 +142,14 @@ class Vehicle:
     def set_prev_error(self):
         self.prev_error = self.error
 
+    def set_lookahead_distance(self):
+        t = 1.5
+        self.lookahead_distance = self.velocity.norm() * t
+
     def update_state_vars(self):
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
+        self.set_lookahead_distance()
         self.set_lookahead_point()
         self.set_prev_error()
         self.set_error()
@@ -208,10 +213,3 @@ class Vehicle:
         vehicle_x, vehicle_y = self.front_mid_point.x, self.front_mid_point.y
         self.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
 
-    def get_vectors(self):
-        vehicle_point = (self.front_mid_point.x, self.front_mid_point.y)
-        headed_direction = (
-            vehicle_point, (self.velocity.get_x() + vehicle_point[0], self.velocity.get_y() + vehicle_point[1]))
-        lookahead_point = (self.front_mid_point.x, self.front_mid_point.y)
-        track_direction = (vehicle_point, lookahead_point)
-        return headed_direction, track_direction

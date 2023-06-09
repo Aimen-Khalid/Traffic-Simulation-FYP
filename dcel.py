@@ -4,8 +4,8 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from geometry import get_intersection_point, get_interpolated_curve
-from graph_to_road_network import get_translated_vertices_segments
+from geometry import get_intersection_point, lane_width
+from graph_to_road_network import get_translated_vertices_segments, translate_segment
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -60,32 +60,13 @@ class Face:
     def get_adjacent_faces(self):
         adjacent_faces = []
         h = self.outer_component
-        while h.next != self.outer_component:  # Walk through all hedges of the cycle and set incident face
+        while h.next != self.outer_component:
             if h.twin.incident_face.name != "BBox":
                 adjacent_faces.append(h.twin.incident_face)
             h = h.next
         if h.twin.incident_face.name != "BBox":
             adjacent_faces.append(h.twin.incident_face)
         return adjacent_faces
-
-    def is_polygon_inside(self, polygon2):
-        try:
-            if self.within(polygon2):
-                return True
-            elif polygon2.within(self):
-                return True
-        except shapely.errors.TopologicalError:
-            for poly in [self, polygon2]:
-                for i, pt in enumerate(poly.exterior.coords):
-                    try:
-                        poly.representative_point().within(polygon2)
-                    except shapely.errors.TopologicalError:
-                        continue
-                    else:
-                        face = poly.exterior.coords[i - 1:i + 2]
-                        face_polygon = shapely.geometry.Polygon(face)
-                        return poly.is_polygon_inside(face_polygon)
-        return False
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
@@ -263,37 +244,6 @@ class OuterFace(Face):
         self.outer_component = edges[2].right_arrow
 
 
-def translate_segment(segment, length, anticlockwise=False):
-    if anticlockwise:
-        length = -1 * length
-    # Extract the starting and ending points of the segment
-    start, end = segment
-
-    start = Point(start[0], start[1])
-    end = Point(end[0], end[1])
-    # Compute the vector representing the segment
-    dx = end.x - start.x
-    dy = end.y - start.y
-
-    # Compute the length of the vector
-    vector_length = ((dx ** 2) + (dy ** 2)) ** 0.5
-    if vector_length == 0:
-        vector_length = 1
-    # Compute the cosine and sine of the angle between the vector and the x-axis
-    cos_theta = dx / vector_length
-    sin_theta = dy / vector_length
-
-    # Translate the starting and ending points of the segment
-    new_start_x = start.x + length * sin_theta
-    new_start_y = start.y - length * cos_theta
-    new_end_x = end.x + length * sin_theta
-    new_end_y = end.y - length * cos_theta
-
-    # Return the translated segment as a list of two tuples
-    translated_segment = [(new_start_x, new_start_y), (new_end_x, new_end_y)]
-    return translated_segment
-
-
 def get_edge_intersection_points(edge, polygon):
     exterior = polygon.exterior
     points = list(exterior.coords)
@@ -329,6 +279,7 @@ class Dcel:
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
         self.__set_face_tags()
+        self.__set_faces_curves()
         self.__set_edge_tags()
         self.__set_adjacent_faces()
         self.__set_junctions_curves()
@@ -352,20 +303,12 @@ class Dcel:
         for face in self.faces:
             face.adjacent_faces = face.get_adjacent_faces()
 
-    def __set_face_tags(self):
+    def __set_faces_curves(self):
         edges = list(self.graph.to_undirected().edges)
         for edge in edges:
-
             midpoint = ((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
-
             face = self.get_face_for_point(midpoint)
-            if face is None:
-                print("None face encountered in __set_face_tags method for edge ", edge)
-                continue
-            face.tag = ROAD
             face.road_separator = get_edge_intersection_points(edge, face.polygon)
-
-            lane_width = self.graph.get_edge_data(edge[0], edge[1])['lane_width']
 
             face.lane_separators.append(
                 get_edge_intersection_points(translate_segment(edge, 0.5 * lane_width), face.polygon))
@@ -381,13 +324,20 @@ class Dcel:
             face.lane_curves.append(
                 get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width, True), face.polygon))
 
+    def __set_face_tags(self):
+        edges = list(self.graph.to_undirected().edges)
+        for edge in edges:
+
+            midpoint = ((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
+
+            face = self.get_face_for_point(midpoint)
+            face.tag = ROAD
+
         nodes = [node for node in self.graph.nodes if self.graph.degree(node) > 4]
         for node in nodes:
             face = self.get_face_for_point(node)
-            if face is None:
-                print("None face encountered in __set_face_tags method at the end")
-                continue
             face.tag = JUNCTION
+
 
     def __set_polygons(self):
         for face in self.faces:
@@ -623,16 +573,6 @@ class Dcel:
                 if polygon.area > max_face_area:  # Find largest face
                     max_face_area = polygon.area
                     max_face = f
-
-        # The max face is actually the inner cycle of the outer face under assumption that faces
-        # do not contain holes or are separated
-        # self.faces.remove(max_face)
-        # h = max_face.outer_component
-        # h.incident_face = self.outer_face
-        # self.outer_face.inner_component = h
-        # while h.next != max_face.outer_component:
-        #     h = h.next
-        #     h.incident_face = self.outer_face
 
     def __set_hedges_direction(self):
         for hedge in self.hedges_map.get_all_hedges():

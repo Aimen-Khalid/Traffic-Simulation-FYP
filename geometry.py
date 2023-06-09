@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from point import ScaledPoint
-lane_width = 50
+lane_width = 10
 
 def get_y_at_x(origin, destination, x):
     """
@@ -51,7 +51,7 @@ def get_intersection_point(segment1, segment2):
     m2, b2 = get_slope_and_y_intercept(segment2)
 
     # Check if the segments are parallel
-    if m1 != "inf" and m2 != "inf" and m1 - m2 == 0:
+    if m1 == m2:
         return [None]
 
     # Check if either segment is vertical

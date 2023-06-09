@@ -98,10 +98,10 @@ def add_error(vehicle, parameters):
     parameters['error'].append(vehicle.error)
 
 
-def add_vectors(vehicle, parameters):
-    headed, track = vehicle.get_vectors()
-    parameters['headed_vector'].append(headed)
-    parameters['track_vector'].append(track)
+def add_track_vector(vehicle, parameters):
+    vehicle_point = (vehicle.front_mid_point.x, vehicle.front_mid_point.y)
+    lookahead_point = (vehicle.lookahead_point.x, vehicle.lookahead_point.y)
+    parameters['track_vector'].append((vehicle_point, lookahead_point))
 
 
 def add_projected_points(vehicle, parameters):
@@ -125,7 +125,7 @@ def update_parameters_list(vehicle, parameters):
     add_projected_points(vehicle, parameters)
     add_speed(vehicle, parameters)
     add_error(vehicle, parameters)
-    add_vectors(vehicle, parameters)
+    add_track_vector(vehicle, parameters)
     add_centroid(vehicle, parameters)
 
 
@@ -196,9 +196,8 @@ def get_artist_objects(ax):
     lookahead_point = ax.scatter([], [], color='red', s=5)
     closest_point = ax.scatter([], [], color='green', s=5)
     text = ax.text(0, 0, "", fontsize=6)
-    headed_line, = ax.plot([], [])
     track_line, = ax.plot([], [])
-    return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, headed_line, track_line, trail_line, lookahead_point
+    return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, track_line, trail_line, lookahead_point
 
 
 def simulate(road_network, vehicle, frames, parameters, file_name):  # reference track
@@ -209,11 +208,11 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
     x, y = vehicle.reference_track.xy
     plt.plot(x, y)
 
-    vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, headed_line, track_line, trail_line, \
+    vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, track_line, trail_line, \
         lookahead_point = get_artist_objects(ax)
 
     def init():
-        return vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, headed_line, track_line
+        return vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, track_line
 
     def animate(i):
         vehicle_line.set_data(parameters['vehicle'][i])
@@ -224,11 +223,6 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         lookahead_point.set_offsets((parameters['lookahead_point'][i].x, parameters['lookahead_point'][i].y))
         closest_point.set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
 
-        start, end = parameters['headed_vector'][i]
-        x = [start[0], end[0]]
-        y = [start[1], end[1]]
-        headed_line.set_data(x, y)
-
         start, end = parameters['track_vector'][i]
         x = [start[0], end[0]]
         y = [start[1], end[1]]
@@ -236,7 +230,7 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
 
         window_size = 13
         text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
-        x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 10
+        x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 15
         y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid']))) / 2
         text.set_position((x, y))
         text.set_text(parameters['text'][i])
@@ -244,7 +238,7 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
         # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
 
-        return vehicle_line, velocity_line, perpendicular_acc_line, parallel_acc_line, text, trail_line, headed_line, track_line
+        return vehicle_line, velocity_line, perpendicular_acc_line, parallel_acc_line, text, trail_line, track_line
 
     print("Animation in progress...")
     start = time.time()
