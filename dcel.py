@@ -1,4 +1,5 @@
 import math as m
+from matplotlib import patches
 from shapely.geometry import Polygon, Point, LineString, MultiPoint
 import random
 import matplotlib.pyplot as plt
@@ -481,17 +482,14 @@ class Dcel:
                     else:
                         start_point = (x[0], y[0])
                         end_point = (x[1], y[1])
-                        # arrow = ax.annotate("", xy=start_point, xytext=end_point, color='blue',
-                        #                     arrowprops=dict(arrowstyle="->"))
-
-                        line = mlines.Line2D([start_point[0], end_point[0]], [start_point[1], end_point[1]],
-                                             color='blue', linewidth=0.5)
-                        ax.add_line(line)
-
                         # Add arrowhead manually
-                        arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
-                        annotation = ax.annotate("", xy=(end_point[0], end_point[1]), xytext=(start_point[0], start_point[1]),
-                                    arrowprops=arrowprops)
+                        arrow_direction = (end_point[0] - start_point[0],
+                                           end_point[1] - start_point[1])
+                        # Create an arrow patch
+                        arrow_patch = patches.FancyArrow(start_point[0], start_point[1], arrow_direction[0], arrow_direction[1],
+                                                         head_width=0.5, head_length=0.5, linewidth=1, color='blue')
+                        # Add the arrow patch to the axis
+                        ax.add_patch(arrow_patch)
 
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
