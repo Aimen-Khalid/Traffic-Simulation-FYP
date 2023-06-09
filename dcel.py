@@ -8,7 +8,6 @@ from geometry import get_intersection_point, lane_width
 from graph_to_road_network import get_translated_vertices_segments, translate_segment
 import matplotlib.lines as mlines
 
-
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
 ROAD = 1
@@ -19,7 +18,7 @@ JUNCTION = 5
 ROAD_SEPARATOR = 6
 
 
-def update_curve(origin, destination, curve):
+def update_curve(origin, curve):
     if Point(origin.x, origin.y).distance(Point(curve[0])) < Point(origin.x, origin.y).distance(Point(curve[1])):
         return curve
     curve[0], curve[1] = curve[1], curve[0]
@@ -44,7 +43,7 @@ def get_angle(line):
 def is_parallel(edge, lane_curve):
     edge_ls = LineString([(edge.origin.x, edge.origin.y), (edge.destination.x, edge.destination.y)])
     lane_curve_ls = LineString(lane_curve)
-    tolerance = 1e-6
+    tolerance = 0.01
     return abs(get_angle(edge_ls) - get_angle(lane_curve_ls)) < tolerance
 
 
@@ -105,11 +104,9 @@ class Face:
             closest_curve_index = 0
         else:
             closest_curve_index = 3
-        self.lane_curves[closest_curve_index] = update_curve(edge.origin, edge.destination,
-                                                             self.lane_curves[closest_curve_index])
+        self.lane_curves[closest_curve_index] = update_curve(edge.origin, self.lane_curves[closest_curve_index])
         next_curve_index = 1 if closest_curve_index == 0 else 2
-        self.lane_curves[next_curve_index] = update_curve(edge.origin, edge.destination,
-                                                          self.lane_curves[next_curve_index])
+        self.lane_curves[next_curve_index] = update_curve(edge.origin, self.lane_curves[next_curve_index])
 
     def set_curves_direction(self):
         if self.tag != ROAD:
@@ -124,6 +121,9 @@ class Face:
             boundary_edges.append(edge)
         self.set_curves_direction_helper(boundary_edges[0].twin)
         self.set_curves_direction_helper(boundary_edges[1].twin)
+
+    def set_junction_curves_direction(self):
+        pass
 
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
@@ -311,7 +311,7 @@ def get_edge_intersection_points(edge, polygon):
     intersection_points = []
     for e in polygon_edges:
         point = get_intersection_point(e, edge)
-        if point != [None] and min_x < point[0] < max_x and min_y < point[1] < max_y:
+        if point != [None] and min_x <= point[0] <= max_x and min_y <= point[1] <= max_y:
             intersection_points.append(point)
     return intersection_points
 
@@ -437,62 +437,63 @@ class Dcel:
 
     def show_road_network(self, axis=None):
         fig, ax = plt.subplots()
+        font_size = 6
+
         if axis is not None:
             ax = axis
         for face in self.faces:
+            # if face.name != 'f236' and face.name != 'f318':
+            #     continue
             if face.tag in [ROAD, JUNCTION]:
                 x, y = face.polygon.exterior.xy
                 # Plot the polygon and fill it with grey color
                 ax.fill(x, y, color='grey', alpha=0.5, edgecolor='none')
 
-            try:
-                if face.tag == ROAD:
-                    x = [face.road_separator[0][0], face.road_separator[1][0]]
-                    y = [face.road_separator[0][1], face.road_separator[1][1]]
-                    ax.plot(x, y, color='black')
+            # x_, y_ = face.polygon.centroid.x, face.polygon.centroid.y
+            # ax.text(x_, y_, face.name)
 
-                    # x_, y_ = face.polygon.centroid.x, face.polygon.centroid.y
-                    # ax.text(x_, y_, face.name)
+            if face.tag == ROAD:
+                x = [face.road_separator[0][0], face.road_separator[1][0]]
+                y = [face.road_separator[0][1], face.road_separator[1][1]]
+                ax.plot(x, y, color='black')
 
-                    x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
-                    y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-                    ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
+                x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
+                y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
+                ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
 
-                    x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
-                    y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-                    ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
+                x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
+                y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
+                ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
 
-                    font_size = 6
-                if face.tag in [ROAD, JUNCTION]:
-                    for i in range(len(face.lane_curves)):
-                        x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
-                        y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
+            if face.tag in [ROAD, JUNCTION]:
+                for i in range(len(face.lane_curves)):
+                    x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
+                    y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
 
-                        # ax.scatter(x[0], y[0], s=font_size)
-                        # ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
-                        #
-                        # ax.scatter(x[1], y[1], s=font_size)
-                        # ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+                    # ax.scatter(x[0], y[0], s=font_size)
+                    # ax.text(x[0]+1, y[0]+1, f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+                    #
+                    # ax.scatter(x[1]+1, y[1]+1, s=font_size)
+                    # ax.text(x[1]+1, y[1]+1, f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
-                        if face.tag == JUNCTION:
-                            ax.plot(x, y, color='blue', linewidth=0.5)
-                        else:
-                            start_point = (x[0], y[0])
-                            end_point = (x[1], y[1])
-                            # arrow = ax.annotate("", xy=start_point, xytext=end_point, color='blue',
-                            #                     arrowprops=dict(arrowstyle="->"))
+                    if face.tag == JUNCTION:
+                        ax.plot(x, y, color='blue', linewidth=0.5)
+                    else:
+                        start_point = (x[0], y[0])
+                        end_point = (x[1], y[1])
+                        # arrow = ax.annotate("", xy=start_point, xytext=end_point, color='blue',
+                        #                     arrowprops=dict(arrowstyle="->"))
 
-                            line = mlines.Line2D([start_point[0], end_point[0]], [start_point[1], end_point[1]],
-                                                color='blue', linewidth=0.5)
-                            ax.add_line(line)
+                        line = mlines.Line2D([start_point[0], end_point[0]], [start_point[1], end_point[1]],
+                                             color='blue', linewidth=0.5)
+                        ax.add_line(line)
 
-                            # Add arrowhead manually
-                            arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
-                            ax.annotate("", xy=(end_point[0], end_point[1]), xytext=(start_point[0], start_point[1]),
-                                        arrowprops=arrowprops)
+                        # Add arrowhead manually
+                        arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
+                        annotation = ax.annotate("", xy=(end_point[0], end_point[1]), xytext=(start_point[0], start_point[1]),
+                                    arrowprops=arrowprops)
+                        annotation.arrow_patch.set_clip_on(True)
 
-            except Exception as e:
-                print(e, "face: ", face.name, face, "\n---- in show_road_network")
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
             x = [edge.origin.x, edge.destination.x]
@@ -642,10 +643,9 @@ class Dcel:
                 self.faces.append(f)
 
                 # Calculate area of face formed by the half-edges
-                try:
-                    polygon = Polygon(vertex_list)
-                except Exception as e:
-                    print(vertex_list)
+
+                polygon = Polygon(vertex_list)
+
                 if polygon.area > max_face_area:  # Find largest face
                     max_face_area = polygon.area
                     max_face = f
@@ -671,18 +671,12 @@ class Dcel:
             for j in range(i + 1, len(self.faces)):
                 face2 = self.faces[j]
                 # Check if face1 is contained within face2 or vice versa
-                try:
-                    if face1.polygon.within(face2.polygon) and face1 != face2:
-                        face2.faces_inside.append(face1)
-                    elif face2.polygon.within(face1.polygon) and face1 != face2:
-                        face1.faces_inside.append(face2)
-                except Exception as e:
-                    print(face1.name, face2.name)
-                    print(face1.get_face_vertices())
-                    print(face2.get_face_vertices())
-                    print(e)
-                    traceback.print_exc()
-                    return
+
+                if face1.polygon.within(face2.polygon) and face1 != face2:
+                    face2.faces_inside.append(face1)
+                elif face2.polygon.within(face1.polygon) and face1 != face2:
+                    face1.faces_inside.append(face2)
+
 
         # Loop over each face
         for i in range(len(self.faces)):
