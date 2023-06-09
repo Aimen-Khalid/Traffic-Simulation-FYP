@@ -6,6 +6,8 @@ import traceback
 import shapely
 from geometry import get_intersection_point, lane_width
 from graph_to_road_network import get_translated_vertices_segments, translate_segment
+import matplotlib.lines as mlines
+
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -15,6 +17,35 @@ BOUNDARY = 3
 PARTITION = 4
 JUNCTION = 5
 ROAD_SEPARATOR = 6
+
+
+def update_curve(origin, destination, curve):
+    if Point(origin.x, origin.y).distance(Point(curve[0])) < Point(origin.x, origin.y).distance(Point(curve[1])):
+        return curve
+    curve[0], curve[1] = curve[1], curve[0]
+    return curve
+
+
+def get_angle(line):
+    if line.coords[0][1] < line.coords[1][1]:
+        st_index = 0
+        end_index = 1
+    elif line.coords[0][1] > line.coords[1][1]:
+        st_index = 1
+        end_index = 0
+    else:
+        return 0
+    dx = line.coords[end_index][0] - line.coords[st_index][0]
+    dy = line.coords[end_index][1] - line.coords[st_index][1]
+    length = m.sqrt(dx * dx + dy * dy)
+    return m.degrees(m.acos(dx / length) if dy > 0 else 2 * m.pi - m.acos(dx / length))
+
+
+def is_parallel(edge, lane_curve):
+    edge_ls = LineString([(edge.origin.x, edge.origin.y), (edge.destination.x, edge.destination.y)])
+    lane_curve_ls = LineString(lane_curve)
+    tolerance = 1e-6
+    return abs(get_angle(edge_ls) - get_angle(lane_curve_ls)) < tolerance
 
 
 class Face:
@@ -68,6 +99,32 @@ class Face:
             adjacent_faces.append(h.twin.incident_face)
         return adjacent_faces
 
+    def set_curves_direction_helper(self, edge):
+        edge_ls = LineString([(edge.origin.x, edge.origin.y), (edge.destination.x, edge.destination.y)])
+        if LineString(self.lane_curves[0]).distance(edge_ls) < LineString(self.lane_curves[3]).distance(edge_ls):
+            closest_curve_index = 0
+        else:
+            closest_curve_index = 3
+        self.lane_curves[closest_curve_index] = update_curve(edge.origin, edge.destination,
+                                                             self.lane_curves[closest_curve_index])
+        next_curve_index = 1 if closest_curve_index == 0 else 2
+        self.lane_curves[next_curve_index] = update_curve(edge.origin, edge.destination,
+                                                          self.lane_curves[next_curve_index])
+
+    def set_curves_direction(self):
+        if self.tag != ROAD:
+            return
+        boundary_edges = []
+        edge = self.outer_component
+        while edge.next != self.outer_component:
+            if edge.tag == BOUNDARY and is_parallel(edge, self.lane_curves[0]):
+                boundary_edges.append(edge)
+            edge = edge.next
+        if edge.tag == BOUNDARY and is_parallel(edge, self.lane_curves[0]):
+            boundary_edges.append(edge)
+        self.set_curves_direction_helper(boundary_edges[0].twin)
+        self.set_curves_direction_helper(boundary_edges[1].twin)
+
     def __repr__(self):
         return f"Face : (n[{self.name}], outer[{self.outer_component.origin.x}, {self.outer_component.origin.y}])"
 
@@ -83,6 +140,7 @@ class HalfEdge:
         self.twin = None
         self.next = None
         self.prev = None
+        self.tag = None
         self.direction = None
         self.visited = False
 
@@ -279,8 +337,8 @@ class Dcel:
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
         self.__set_face_tags()
-        self.__set_faces_curves()
         self.__set_edge_tags()
+        self.__set_faces_curves()
         self.__set_adjacent_faces()
         self.__set_junctions_curves()
 
@@ -296,8 +354,12 @@ class Dcel:
             if edge.right_arrow.incident_face.tag in [ROAD, JUNCTION] and \
                     edge.left_arrow.incident_face.tag in [ROAD, JUNCTION]:
                 edge.tag = PARTITION
+                edge.left_arrow.tag = PARTITION
+                edge.right_arrow.tag = PARTITION
             else:
                 edge.tag = BOUNDARY
+                edge.left_arrow.tag = BOUNDARY
+                edge.right_arrow.tag = BOUNDARY
 
     def __set_adjacent_faces(self):
         for face in self.faces:
@@ -323,11 +385,11 @@ class Dcel:
                 get_edge_intersection_points(translate_segment(edge, 0.25 * lane_width, True), face.polygon))
             face.lane_curves.append(
                 get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width, True), face.polygon))
+            face.set_curves_direction()
 
     def __set_face_tags(self):
         edges = list(self.graph.to_undirected().edges)
         for edge in edges:
-
             midpoint = ((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
 
             face = self.get_face_for_point(midpoint)
@@ -337,7 +399,6 @@ class Dcel:
         for node in nodes:
             face = self.get_face_for_point(node)
             face.tag = JUNCTION
-
 
     def __set_polygons(self):
         for face in self.faces:
@@ -413,7 +474,22 @@ class Dcel:
                         # ax.scatter(x[1], y[1], s=font_size)
                         # ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
-                        ax.plot(x, y, color='blue', linewidth=0.5)
+                        if face.tag == JUNCTION:
+                            ax.plot(x, y, color='blue', linewidth=0.5)
+                        else:
+                            start_point = (x[0], y[0])
+                            end_point = (x[1], y[1])
+                            # arrow = ax.annotate("", xy=start_point, xytext=end_point, color='blue',
+                            #                     arrowprops=dict(arrowstyle="->"))
+
+                            line = mlines.Line2D([start_point[0], end_point[0]], [start_point[1], end_point[1]],
+                                                color='blue', linewidth=0.5)
+                            ax.add_line(line)
+
+                            # Add arrowhead manually
+                            arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
+                            ax.annotate("", xy=(end_point[0], end_point[1]), xytext=(start_point[0], start_point[1]),
+                                        arrowprops=arrowprops)
 
             except Exception as e:
                 print(e, "face: ", face.name, face, "\n---- in show_road_network")

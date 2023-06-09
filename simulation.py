@@ -270,7 +270,6 @@ def create_simulation_video(vehicle, road_network, frames):
     file_name = f"p{car.params['P_PER_ACC_WEIGHT']} " \
                 f"d {car.params['D_PER_ACC_WEIGHT']} " \
                 f"acc_lim {vehicle.acc_limit} " \
-                f"dist {vehicle.lookahead_distance} " \
                 f"init_speed {round(vehicle.initial_speed, 2)} " \
                 f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}.mp4"
 
