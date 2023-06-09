@@ -471,10 +471,10 @@ class Dcel:
                     y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
 
                     # ax.scatter(x[0], y[0], s=font_size)
-                    # ax.text(x[0]+1, y[0]+1, f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+                    # ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
                     #
-                    # ax.scatter(x[1]+1, y[1]+1, s=font_size)
-                    # ax.text(x[1]+1, y[1]+1, f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+                    # ax.scatter(x[1], y[1], s=font_size)
+                    # ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
                     if face.tag == JUNCTION:
                         ax.plot(x, y, color='blue', linewidth=0.5)
@@ -492,7 +492,6 @@ class Dcel:
                         arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
                         annotation = ax.annotate("", xy=(end_point[0], end_point[1]), xytext=(start_point[0], start_point[1]),
                                     arrowprops=arrowprops)
-                        annotation.arrow_patch.set_clip_on(True)
 
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
@@ -731,7 +730,7 @@ class Dcel:
             min_distance = float('inf')
             closest_point = None
 
-            for point in list(lane_curve.coords):
+            for point in list(lane_curve.coords)[:2]:
                 distance = Point(point).distance(polygon)
                 if distance < min_distance:
                     min_distance = distance
