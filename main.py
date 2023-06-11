@@ -36,6 +36,7 @@ def show_saved_road_network(area_name):
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
+    show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
     dcel_obj.show_road_network()
@@ -45,14 +46,15 @@ def get_saved_road_network(area_name):
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
+    # show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
     return dcel_obj
 
 
-def create_own_road_network():
-    vertices_fn = "test_vertices.txt"
-    segments_fn = "test_segments.txt"
+def create_own_road_network(fn):
+    vertices_fn = f"{fn}_vertices.txt"
+    segments_fn = f"{fn}_segments.txt"
     draw_and_save_road_network_graph(vertices_fn, segments_fn)
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
     dcel_obj = dcel.Dcel(graph)
@@ -60,12 +62,11 @@ def create_own_road_network():
     dcel_obj.show_road_network()
 
 
-def create_track():
-    file_name = "track.txt"
-
-    # track, _ = get_vertices_and_segments()
-    # files_functions.write_vertices_to_file(track, file_name)
-
+def create_track(file_name, new):
+    if new:
+        track, _ = get_vertices_and_segments()
+        track.append(track[0])
+        files_functions.write_vertices_to_file(track, file_name)
     track = files_functions.load_vertices_from_file(file_name)
     # return LineString([(2, -7), (35, 8), (55, 12), (75, 15), (95, 10), (115, 8), (135, 9), (150, 12), (170, 20)])
     # return LineString([(2, 7), (30, 8), (60, 20), (90, 7), (120, 6), (150, 3), (180, 2), (220, 50), (250, 20)])
@@ -75,25 +76,36 @@ def create_track():
 def road_network_main():
     # coordinates = osm.get_coordinates_from_map()
     # area_name = input("Name the area that lies within the selected coordinates: ")
-    # create_own_road_network()
     # show_road_network(coordinates, area_name)
+
+    # fn = "test"
+    # create_own_road_network(fn)
+
     show_saved_road_network("test")
 
 
 def simulation_main():
-    frames = 3500
-    track = create_track()
-    vehicle = car.Vehicle(length=3, width=1.5, centroid=ScaledPoint(track.coords[1][0], track.coords[1][1]),
-                          angle=90, velocity=ScaledPoint(6, 0), acceleration=ScaledPoint(0, 0), reference_track=track)
-    road_network = get_saved_road_network("Bahria")
+    frames = 10000
+    # track = create_track("track", new=False)
+    road_network = get_saved_road_network("test")
+    st_face = road_network.faces[0]
+
+    reference_track = LineString(st_face.lane_curves[0])
+
+    vehicle = car.Vehicle(length=4, width=2,
+                          centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
+                          angle=90, velocity=ScaledPoint(0, 6), acceleration=ScaledPoint(0, 0),
+                          reference_track=reference_track)
+    vehicle.current_face = st_face
+    vehicle.prev_face = vehicle.current_face
+    start, end = reference_track.coords[0], reference_track.coords[1]
+    end = ScaledPoint(end[0] - start[0], end[1] - start[1])
+    end = end / end.norm()
+    end = end * 6
+    vehicle.velocity = end
+    vehicle.set_reference_curve(road_network)
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 
-road_network_main()
-# simulation_main()
-
-
-
-
-
-
+# road_network_main()
+simulation_main()

@@ -30,8 +30,8 @@ def get_vertices_and_segments():
     box_size = 5
     # set the axis limits and ticks
     ax.axis([0, 50, 0, 50])
-    ax.xaxis.set_ticks(range(0, 100, box_size))
-    ax.yaxis.set_ticks(range(0, 100, box_size))
+    ax.xaxis.set_ticks(range(0, 200, box_size))
+    ax.yaxis.set_ticks(range(0, 200, box_size))
 
     # add a grid to the plot
     ax.grid(color='green', linestyle='-', linewidth=0.5)

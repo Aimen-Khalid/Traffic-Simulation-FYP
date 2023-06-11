@@ -44,14 +44,14 @@ def add_trail(vehicle, parameters):
 
 def add_text(vehicle, parameters):
     text = (
-            f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
-            + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
-            + '\nangle: '
-            + str(round(math.degrees(vehicle.error), 2)) + ' degrees'
-            + '\nspeed: '
+            # f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
+            # + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
+            # + '\nangle: '
+            # + str(round(math.degrees(vehicle.error), 2)) + ' degrees' +
+            '\nspeed: '
             + str(f'{round(vehicle.velocity.norm(), 2)}') + ' ms'
-            + '\nerror: '
-            + str(f'{round(vehicle.error, 2)}')
+            # + '\nerror: '
+            # + str(f'{round(vehicle.error, 2)}')
     )
     parameters['text'].append(text)
 
@@ -136,7 +136,16 @@ def compute_parameters(vehicle, road_network, frames):
     # Use tqdm to display a progress bar while computing the parameters for each frame
     with tqdm(total=frames) as pbar:
         for _ in range(frames):
+
+
             vehicle.update_state_vars()
+            # vehicle.next_curve = vehicle.current_face.get_connected_curves(vehicle.reference_track)[0]
+
+            vehicle.set_prev_face()
+            vehicle.set_current_face(road_network)
+
+            # if vehicle.prev_face != vehicle.current_face:
+            #     vehicle.reference_track = vehicle.next_curve
             update_parameters_list(vehicle, parameters)
             pbar.update(1)
     end = time.time()
@@ -189,7 +198,7 @@ def plot_parameters(vehicle, start, end, fig_name):
 
 def get_artist_objects(ax):
     vehicle_line, = ax.plot([], [])
-    trail_line, = ax.plot([], [], color=TRAIL_COLOR)
+    trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
     acc_line, = ax.plot([], [])
     acc2_line, = ax.plot([], [])
     velocity_line, = ax.plot([], [])
@@ -203,8 +212,11 @@ def get_artist_objects(ax):
 def simulate(road_network, vehicle, frames, parameters, file_name):  # reference track
     fig = plt.figure()
     ax = plt.gca()
+    ax.axis("off")
     ax.set_aspect('equal', adjustable='box')
-    # road_network.show_road_network(ax)
+
+    road_network.show_road_network(ax)
+
     x, y = vehicle.reference_track.xy
     plt.plot(x, y)
 
@@ -228,10 +240,10 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         y = [start[1], end[1]]
         track_line.set_data(x, y)
 
-        window_size = 13
+        window_size = 30
         # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
-        # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid']))) - 15
-        # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid']))) / 2
+        # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid'])))
+        # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid'])))
         # text.set_position((x, y))
         # text.set_text(parameters['text'][i])
 
@@ -271,7 +283,9 @@ def create_simulation_video(vehicle, road_network, frames):
                 f"d {car.params['D_PER_ACC_WEIGHT']} " \
                 f"acc_lim {vehicle.acc_limit} " \
                 f"init_speed {round(vehicle.initial_speed, 2)} " \
-                f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}.mp4"
+                f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}" \
+                f"lookahead_time {vehicle.lookahead_time}"\
+                f".mp4"
 
     simulate(road_network, vehicle, frames=frames, parameters=parameters, file_name=file_name)
     winsound.Beep(frequency=2500, duration=1000)

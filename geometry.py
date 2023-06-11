@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from point import ScaledPoint
-lane_width = 5
+lane_width = 15
 
 def get_y_at_x(origin, destination, x):
     """
@@ -36,6 +36,16 @@ def get_slope_and_y_intercept(segment):
     return slope, y_intercept
 
 
+def get_common_point(segment1, segment2):
+    points = [segment1[0], segment1[1], segment2[0], segment2[1]]
+    length = 4
+    for i in range(length):
+        for j in range(i+1, length):
+            if points[i] == points[j]:
+                return points[i]
+    return [None]
+
+
 def get_intersection_point(segment1, segment2):
     """
     Calculates the intersection point of two line segments.
@@ -52,7 +62,7 @@ def get_intersection_point(segment1, segment2):
 
     # Check if the segments are parallel
     if m1 == m2:
-        return [None]
+        return get_common_point(segment1, segment2)
 
     # Check if either segment is vertical
     if m1 == "inf":
@@ -251,3 +261,4 @@ def keep_in_limit(vector, limit):
 # plt.plot(x, y)
 # plt.show()
 #
+

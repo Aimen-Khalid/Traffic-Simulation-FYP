@@ -7,16 +7,23 @@ from math import cos, sin, radians
 from point import ScaledPoint
 from shapely import Point, LineString
 from shapely.ops import nearest_points
+from shapely.ops import linemerge
+
+
+def merge_line_strings(l1, l2):
+    coords = list(l1.coords)[:-1]
+    coords.extend(list(l2.coords))
+    return LineString(coords)
 
 
 # constants
 params = {
     "dt": 0.01,
     "D_PER_ACC_WEIGHT": 20,
-    "P_PER_ACC_WEIGHT": 10,
-    "P_PARALLEL_DEC_WEIGHT": 10,
-    "P_PARALLEL_ACC_WEIGHT": 0.2,
-    "angle_threshold": 5
+    "P_PER_ACC_WEIGHT": 20,
+    "P_PARALLEL_DEC_WEIGHT": 30,
+    "P_PARALLEL_ACC_WEIGHT": 0.5,
+    "angle_threshold": 2.5
 }
 
 
@@ -26,6 +33,7 @@ class Vehicle:
 
         # parameters
         self.lookahead_distance = 10
+        self.lookahead_time = 2
         self.angle_threshold = params["angle_threshold"]
         self.initial_speed = velocity.norm()
         self.length = length
@@ -35,6 +43,7 @@ class Vehicle:
         self.goal_speed = 8
         self.theta = -90
         self.reference_track = reference_track
+        self.next_lane_curve = None
 
         # state variables
         self.centroid = centroid
@@ -51,6 +60,7 @@ class Vehicle:
         self.error = 0
         self.prev_error = 0
         self.current_face = None
+        self.prev_face = None
         self.face_mid_point = None
 
     def state_to_corners(self):
@@ -107,6 +117,9 @@ class Vehicle:
     def set_velocity(self):
         acc = self.controller()
         self.velocity += (acc * params["dt"])
+        if self.velocity.norm() < 0.5:
+            self.velocity = self.velocity / self.velocity.norm()
+            self.velocity = self.velocity * 0.5
         self.velocity = geometry.keep_in_limit(self.velocity, self.speed_limit)
 
     def set_centroid(self):
@@ -128,7 +141,9 @@ class Vehicle:
         boundary = circle.boundary  # Get the boundary of the circle
         intersection = boundary.intersection(self.reference_track)
         if intersection.is_empty:
-            return None
+            closest_point, _ = nearest_points(self.reference_track, self.front_mid_point)
+            self.lookahead_point = closest_point
+            return
         # Translate the velocity vector to car centroid
         vel_vector = Point(vel_vector.x + circle_center.x, vel_vector.y + circle_center.y)
         # If multiple intersection points exist, find the one closest to the velocity vector
@@ -143,8 +158,10 @@ class Vehicle:
         self.prev_error = self.error
 
     def set_lookahead_distance(self):
-        t = 1.5
-        self.lookahead_distance = self.velocity.norm() * t
+        self.lookahead_distance = self.velocity.norm() * self.lookahead_time
+
+    def set_prev_face(self):
+        self.prev_face = self.current_face
 
     def update_state_vars(self):
         self.set_vehicle_front_mid_point()
@@ -191,7 +208,9 @@ class Vehicle:
         magnitude1 = math.sqrt(vector1.x ** 2 + vector1.y ** 2)
         magnitude2 = math.sqrt(vector2.x ** 2 + vector2.y ** 2)
 
-        return math.acos(dot_product / (magnitude1 * magnitude2))
+        cos_theta = dot_product / (magnitude1 * magnitude2)
+        cos_theta = min(cos_theta, 1)
+        return math.acos(cos_theta)
 
     def get_error_sign(self):
         segment_point_1 = Point(self.front_mid_point.x, self.front_mid_point.y)
@@ -213,3 +232,19 @@ class Vehicle:
         vehicle_x, vehicle_y = self.front_mid_point.x, self.front_mid_point.y
         self.current_face = road_network.get_face_for_point((vehicle_x, vehicle_y))
 
+    def set_reference_curve(self, road_network):
+        starting_face = self.current_face
+        connected_curves = self.current_face.get_connected_curves(self.reference_track)
+        while len(connected_curves) != 0:
+            if len(connected_curves) == 1:
+                next_curve = connected_curves[0]
+            else:
+                next_curve = connected_curves[2]
+            self.reference_track = merge_line_strings(self.reference_track, LineString(next_curve))
+            mid_point = ((next_curve[0][0] + next_curve[1][0])/2, (next_curve[0][1] + next_curve[1][1])/2)
+            self.current_face = road_network.get_face_for_point(mid_point)
+            if self.current_face == starting_face:
+                return
+            last_curve = LineString(list(self.reference_track.coords)[-2:])
+            connected_curves = self.current_face.get_connected_curves(last_curve)
+        self.current_face = starting_face

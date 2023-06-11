@@ -2,7 +2,7 @@ import math
 from shapely import Point, LineString
 import files_functions
 import networkx as nx
-from rtree import index
+# from rtree import index
 import geometry
 import matplotlib.pyplot as plt
 
@@ -111,7 +111,11 @@ def set_remaining_edges_translated_points(graph):
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
                 nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
                 continue
-            index = neighbor_edges.index(edge)
+            # index = neighbor_edges.index(edge)
+            if edge in neighbor_edges:
+                index = neighbor_edges.index(edge)
+            else:
+                index = neighbor_edges.index(((edge[1][0], edge[1][1]), (edge[0][0], edge[0][1])))
             prev = len(neighbor_edges) - 1 if index == 0 else index - 1
             cw_end = graph.get_edge_data(neighbor_edges[prev][0], neighbor_edges[prev][1])['cw_start']
             next_ = 0 if index == len(neighbor_edges) - 1 else index + 1
