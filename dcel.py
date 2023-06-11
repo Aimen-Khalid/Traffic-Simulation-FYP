@@ -5,7 +5,7 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from geometry import get_intersection_point, lane_width
+from geometry import get_intersection_point, lane_width, get_interpolated_curve
 from graph_to_road_network import get_translated_vertices_segments, translate_segment
 import matplotlib.lines as mlines
 
@@ -398,8 +398,6 @@ class Dcel:
         for edge in edges:
             midpoint = ((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
             face = self.get_face_for_point(midpoint)
-            if face.name == 'f9':
-                print("here")
             face.road_separator = get_edge_intersection_points(edge, face.polygon)
 
             face.lane_separators.append(
@@ -515,15 +513,11 @@ class Dcel:
                 start_point = (x[0], y[0])
                 end_point = (x[1], y[1])
 
-                # line = mlines.Line2D([start_point[0], end_point[0]], [start_point[1], end_point[1]],
-                #                      color='blue', linewidth=0.5)
-                # ax.add_line(line)
-
                 # Add arrowhead manually
-                arrowprops = dict(arrowstyle='->', color='blue', linewidth=0.5)
+                arrow_props = dict(arrowstyle='->', color='blue', linewidth=0.5)
                 annotation = ax.annotate("", xy=(end_point[0], end_point[1]),
                                          xytext=(start_point[0], start_point[1]),
-                                         arrowprops=arrowprops)
+                                         arrowprops=arrow_props)
 
     def plot_edges(self, ax):
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
@@ -782,8 +776,6 @@ class Dcel:
 
             return closest_point
 
-        # visited_faces = []
-
         for face in self.faces:
             if face.tag == JUNCTION:
                 for i in range(len(face.adjacent_faces)):
@@ -864,9 +856,9 @@ class Dcel:
                         closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
                         closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
 
-                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
+                        interpolated_curve = get_interpolated_curve(master_curve, next_curve)
+                        face.lane_curves.append(interpolated_curve)
+                        # face.lane_curves.append([closest_point1, closest_point2])
 
                         closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
                         closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)

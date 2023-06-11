@@ -25,6 +25,14 @@ def show_graph(graph):
     plt.show()
 
 
+def initialize_velocity(reference_track, magnitude):
+    start, end = reference_track.coords[0], reference_track.coords[1]
+    end = ScaledPoint(end[0] - start[0], end[1] - start[1])
+    end = end / end.norm()
+    end = end * magnitude
+    return end
+
+
 def show_road_network(coordinates, area_name):
     graph = files_functions.extract_road_network_graph(coordinates, area_name)
     dcel_obj = dcel.Dcel(graph)
@@ -36,7 +44,7 @@ def show_saved_road_network(area_name):
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
-    show_graph(graph)
+    # show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
     dcel_obj.show_road_network()
@@ -85,12 +93,12 @@ def road_network_main():
 
 
 def simulation_main():
-    frames = 10000
-    # track = create_track("track", new=False)
-    road_network = get_saved_road_network("test")
+    frames = 3500
+    track = create_track("track", new=False)
+    road_network = get_saved_road_network("Bahria")
     st_face = road_network.faces[0]
 
-    reference_track = LineString(st_face.lane_curves[0])
+    reference_track = track#LineString(st_face.lane_curves[0])
 
     vehicle = car.Vehicle(length=4, width=2,
                           centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
@@ -98,12 +106,8 @@ def simulation_main():
                           reference_track=reference_track)
     vehicle.current_face = st_face
     vehicle.prev_face = vehicle.current_face
-    start, end = reference_track.coords[0], reference_track.coords[1]
-    end = ScaledPoint(end[0] - start[0], end[1] - start[1])
-    end = end / end.norm()
-    end = end * 6
-    vehicle.velocity = end
-    vehicle.set_reference_curve(road_network)
+    vehicle.velocity = initialize_velocity(reference_track, 6)
+    # vehicle.set_reference_curve(road_network)
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 

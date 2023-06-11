@@ -7,6 +7,7 @@ import geometry
 from matplotlib.animation import FuncAnimation
 import math
 import winsound
+from matplotlib.patches import Circle
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'lightgrey'
@@ -32,7 +33,8 @@ def initialize_parameters_dict():
         'lookahead_point': [],
         'closest_point': [],
         'headed_vector': [],
-        'track_vector': []
+        'track_vector': [],
+        'circle': []
     }
 
 
@@ -44,14 +46,14 @@ def add_trail(vehicle, parameters):
 
 def add_text(vehicle, parameters):
     text = (
-            # f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
-            # + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
-            # + '\nangle: '
-            # + str(round(math.degrees(vehicle.error), 2)) + ' degrees' +
+        # f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
+        # + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
+        # + '\nangle: '
+        # + str(round(math.degrees(vehicle.error), 2)) + ' degrees' +
             '\nspeed: '
             + str(f'{round(vehicle.velocity.norm(), 2)}') + ' ms'
-            # + '\nerror: '
-            # + str(f'{round(vehicle.error, 2)}')
+        # + '\nerror: '
+        # + str(f'{round(vehicle.error, 2)}')
     )
     parameters['text'].append(text)
 
@@ -113,6 +115,10 @@ def add_centroid(vehicle, parameters):
     parameters['centroid'].append(vehicle.centroid)
 
 
+def add_circle(vehicle, parameters):
+    parameters['circle'].append((vehicle.front_mid_point, vehicle.lookahead_distance))
+
+
 def update_parameters_list(vehicle, parameters):
     add_trail(vehicle, parameters)
     add_text(vehicle, parameters)
@@ -127,6 +133,7 @@ def update_parameters_list(vehicle, parameters):
     add_error(vehicle, parameters)
     add_track_vector(vehicle, parameters)
     add_centroid(vehicle, parameters)
+    add_circle(vehicle, parameters)
 
 
 def compute_parameters(vehicle, road_network, frames):
@@ -136,8 +143,6 @@ def compute_parameters(vehicle, road_network, frames):
     # Use tqdm to display a progress bar while computing the parameters for each frame
     with tqdm(total=frames) as pbar:
         for _ in range(frames):
-
-
             vehicle.update_state_vars()
             # vehicle.next_curve = vehicle.current_face.get_connected_curves(vehicle.reference_track)[0]
 
@@ -206,7 +211,9 @@ def get_artist_objects(ax):
     closest_point = ax.scatter([], [], color='green', s=5)
     text = ax.text(0, 0, "", fontsize=6)
     track_line, = ax.plot([], [])
-    return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, track_line, trail_line, lookahead_point
+    circle = Circle((0.5, 0.5), radius=0.3, edgecolor='black', facecolor='none')
+    ax.add_patch(circle)
+    return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, track_line, trail_line, lookahead_point, circle
 
 
 def simulate(road_network, vehicle, frames, parameters, file_name):  # reference track
@@ -215,16 +222,17 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
     ax.axis("off")
     ax.set_aspect('equal', adjustable='box')
 
-    road_network.show_road_network(ax)
+    # road_network.show_road_network(ax)
 
     x, y = vehicle.reference_track.xy
     plt.plot(x, y)
 
     vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, track_line, trail_line, \
-        lookahead_point = get_artist_objects(ax)
+        lookahead_point, circle = get_artist_objects(ax)
 
     def init():
-        return vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, track_line
+        return vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, track_line, trail_line, \
+            lookahead_point, circle
 
     def animate(i):
         vehicle_line.set_data(parameters['vehicle'][i])
@@ -234,23 +242,25 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         parallel_acc_line.set_data(parameters['parallel_acc'][i])
         lookahead_point.set_offsets((parameters['lookahead_point'][i].x, parameters['lookahead_point'][i].y))
         closest_point.set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
+        circle.set_radius(parameters["circle"][i][1])
+        circle.set_center((parameters["circle"][i][0].x, parameters["circle"][i][0].y))
 
         start, end = parameters['track_vector'][i]
         x = [start[0], end[0]]
         y = [start[1], end[1]]
         track_line.set_data(x, y)
 
-        window_size = 30
+        window_size = 35
         # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
         # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid'])))
         # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid'])))
         # text.set_position((x, y))
         # text.set_text(parameters['text'][i])
 
-        # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
-        # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
+        ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
+        ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
 
-        return vehicle_line, velocity_line, perpendicular_acc_line, parallel_acc_line, text, trail_line, track_line
+        return vehicle_line, velocity_line, perpendicular_acc_line, parallel_acc_line, text, trail_line, track_line, circle
 
     print("Animation in progress...")
     start = time.time()
@@ -284,7 +294,7 @@ def create_simulation_video(vehicle, road_network, frames):
                 f"acc_lim {vehicle.acc_limit} " \
                 f"init_speed {round(vehicle.initial_speed, 2)} " \
                 f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}" \
-                f"lookahead_time {vehicle.lookahead_time}"\
+                f"lookahead_time {vehicle.lookahead_time}" \
                 f".mp4"
 
     simulate(road_network, vehicle, frames=frames, parameters=parameters, file_name=file_name)

@@ -8,6 +8,7 @@ from point import ScaledPoint
 from shapely import Point, LineString
 from shapely.ops import nearest_points
 from shapely.ops import linemerge
+from shapely.ops import split
 
 
 def merge_line_strings(l1, l2):
@@ -20,8 +21,8 @@ def merge_line_strings(l1, l2):
 params = {
     "dt": 0.01,
     "D_PER_ACC_WEIGHT": 20,
-    "P_PER_ACC_WEIGHT": 20,
-    "P_PARALLEL_DEC_WEIGHT": 30,
+    "P_PER_ACC_WEIGHT": 10,
+    "P_PARALLEL_DEC_WEIGHT": 10,
     "P_PARALLEL_ACC_WEIGHT": 0.5,
     "angle_threshold": 2.5
 }
@@ -33,7 +34,7 @@ class Vehicle:
 
         # parameters
         self.lookahead_distance = 10
-        self.lookahead_time = 2
+        self.lookahead_time = 1.5
         self.angle_threshold = params["angle_threshold"]
         self.initial_speed = velocity.norm()
         self.length = length
@@ -134,7 +135,7 @@ class Vehicle:
             Finds the intersection points of the circle and track.
             Returns the intersection point closest to the car's velocity vector
         """
-        circle_center = Point(self.centroid.get_x(), self.centroid.get_y())
+        circle_center = self.front_mid_point
         circle_radius = self.lookahead_distance
         vel_vector = Point(self.velocity.get_x(), self.velocity.get_y())
         circle = circle_center.buffer(circle_radius)  # Create a circle geometry
@@ -150,6 +151,20 @@ class Vehicle:
         if intersection.geom_type == 'MultiPoint':
             intersection = nearest_points(vel_vector, intersection)[1]
         self.lookahead_point = intersection
+
+    def set_lookahead_point2(self):
+        car_line = LineString(self.get_car_perpendicular_line())
+        circle_center = self.front_mid_point
+        radius = self.lookahead_distance
+        vel_vector = Point(self.velocity.x, self.velocity.y)
+        vel_vector = Point(vel_vector.x + circle_center.x, vel_vector.y + circle_center.y)
+        velocity_line = LineString([(circle_center.x, circle_center.y), (vel_vector.x, vel_vector.y)])
+        extended_velocity_line = velocity_line.parallel_offset(radius + 20, 'right')
+        semicircle = circle_center.buffer(radius, 0, 180)
+        intersection_points = semicircle.intersection(extended_velocity_line)
+        end_point = velocity_line.coords[-1]
+        farthest_point = max(intersection_points, key=lambda p: p.distance(Point(end_point)))
+        return farthest_point
 
     def set_orientation(self):
         self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
