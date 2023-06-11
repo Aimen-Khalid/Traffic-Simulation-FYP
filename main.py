@@ -111,5 +111,5 @@ def simulation_main():
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 
-# road_network_main()
-simulation_main()
+road_network_main()
+# simulation_main()

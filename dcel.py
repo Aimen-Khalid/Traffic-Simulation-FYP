@@ -856,9 +856,9 @@ class Dcel:
                         closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
                         closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
 
-                        interpolated_curve = get_interpolated_curve(master_curve, next_curve)
-                        face.lane_curves.append(interpolated_curve)
-                        # face.lane_curves.append([closest_point1, closest_point2])
+                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
+                        # face.lane_curves.append(interpolated_curve)
+                        face.lane_curves.append([closest_point1, closest_point2])
 
                         closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
                         closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
