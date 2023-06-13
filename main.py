@@ -81,35 +81,34 @@ def create_track(file_name, new):
     return LineString(track)
 
 
-def road_network_main():
+def road_network_main(fn, new):
     # coordinates = osm.get_coordinates_from_map()
     # area_name = input("Name the area that lies within the selected coordinates: ")
     # show_road_network(coordinates, area_name)
 
-    # fn = "test"
-    # create_own_road_network(fn)
+    if new:
+        create_own_road_network(fn)
 
-    show_saved_road_network("test")
+    show_saved_road_network(fn)
 
 
 def simulation_main():
     frames = 3500
     track = create_track("track", new=False)
-    road_network = get_saved_road_network("Bahria")
+    road_network = get_saved_road_network("test")
     st_face = road_network.faces[0]
 
     reference_track = track#LineString(st_face.lane_curves[0])
 
     vehicle = car.Vehicle(length=4, width=2,
                           centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
-                          angle=90, velocity=ScaledPoint(0, 6), acceleration=ScaledPoint(0, 0),
+                          angle=90, velocity=initialize_velocity(reference_track, 6), acceleration=ScaledPoint(0, 0),
                           reference_track=reference_track)
     vehicle.current_face = st_face
     vehicle.prev_face = vehicle.current_face
-    vehicle.velocity = initialize_velocity(reference_track, 6)
     # vehicle.set_reference_curve(road_network)
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 
-road_network_main()
+road_network_main("single_junction", new=False)
 # simulation_main()

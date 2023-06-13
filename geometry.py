@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from point import ScaledPoint
-lane_width = 15
+lane_width = 20
 
 def get_y_at_x(origin, destination, x):
     """
@@ -242,33 +242,4 @@ def keep_in_limit(vector, limit):
         vector /= vector.norm()
         vector *= limit
     return vector
-
-
-l1 = [[96.25, 80.0], [96.25, 25.0]]#[(460, -2), (338, 71)]
-l2 = [[170.0, 83.75], [100.0, 83.75]]#[(317, 71), (226, 26)]
-x = [l1[0][0], l1[1][0]]
-y = [l1[0][1], l1[1][1]]
-plt.plot(x, y)
-
-x = [l2[0][0], l2[1][0]]
-y = [l2[0][1], l2[1][1]]
-plt.plot(x, y)
-
-# curve = get_interpolated_curve(l2, l1)
-# x = [curve[i][0] for i in range(len(curve))]
-# y = [curve[i][1] for i in range(len(curve))]
-#
-# plt.plot(x, y)
-# plt.show()
-
-
-def get_lookahead_point(vehicle):
-    self = vehicle
-    per_line = self.get_car_perpendicular_line()
-    center = self.front_mid_point
-    radius = self.lookahead_distance
-    vel_vector = Point(self.velocity.x, self.velocity.y)
-    vel_vector = Point(vel_vector.x + center.x, vel_vector.y + center.y)
-    vel_line = [(center.x, center.y), (vel_vector.x, vel_vector.y)]
-
 

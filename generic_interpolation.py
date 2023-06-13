@@ -82,8 +82,8 @@ def get_interpolated_curve(line_string1, line_string2, limit):
     return list(filtered_line_string.coords)
 
 
-l1 = [[0, 1], [10, 20]]  # [(460, -2), (338, 71)]
-l2 = [[170.0, 83.75], [100.0, 83.75]]  # [(317, 71), (226, 26)]
+l1 = [[21, 38], [72, 89]]
+l2 = [[96, 115], [38, 146]]
 x = [l1[0][0], l1[1][0]]
 y = [l1[0][1], l1[1][1]]
 plt.plot(x, y)

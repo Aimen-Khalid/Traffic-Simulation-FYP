@@ -5,7 +5,8 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from geometry import get_intersection_point, lane_width, get_interpolated_curve
+from geometry import get_intersection_point, lane_width
+from generic_interpolation import get_interpolated_curve
 from graph_to_road_network import get_translated_vertices_segments, translate_segment
 import matplotlib.lines as mlines
 
@@ -475,11 +476,17 @@ class Dcel:
                 for i in range(len(face.lane_curves)):
                     x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
                     y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
-                    ax.scatter(x[0], y[0], s=font_size)
-                    ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
 
-                    ax.scatter(x[1], y[1], s=font_size)
-                    ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+                    x, y = LineString(face.lane_curves[i]).xy
+                    for j in range(len(x)):
+                        ax.scatter(x[j], y[j], s=2, color="red")
+
+                    # ax.scatter(x[0], y[0], s=font_size)
+                    ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+                    #
+                    # ax.scatter(x[1], y[1], s=font_size)
+                    ax.text(x[-1], y[-1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
             x = [edge.origin.x, edge.destination.x]
@@ -508,16 +515,26 @@ class Dcel:
             x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
             y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
             if face.tag == JUNCTION:
+                x, y = LineString(face.lane_curves[i]).xy
                 ax.plot(x, y, color='blue', linewidth=0.2)
             else:
                 start_point = (x[0], y[0])
                 end_point = (x[1], y[1])
 
                 # Add arrowhead manually
-                arrow_props = dict(arrowstyle='->', color='blue', linewidth=0.5)
-                annotation = ax.annotate("", xy=(end_point[0], end_point[1]),
-                                         xytext=(start_point[0], start_point[1]),
-                                         arrowprops=arrow_props)
+                arrow_direction = (end_point[0] - start_point[0],
+                                   end_point[1] - start_point[1])
+                # Create an arrow patch
+                arrow_patch = patches.FancyArrow(start_point[0], start_point[1], arrow_direction[0], arrow_direction[1],
+                                                 head_width=1, head_length=1, linewidth=0.2, color='blue')
+                # Add the arrow patch to the axis
+                ax.add_patch(arrow_patch)
+
+                # Add arrowhead manually
+                # arrow_props = dict(arrowstyle='->', color='blue', linewidth=0.5)
+                # annotation = ax.annotate("", xy=(end_point[0], end_point[1]),
+                #                          xytext=(start_point[0], start_point[1]),
+                #                          arrowprops=arrow_props)
 
     def plot_edges(self, ax):
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
@@ -536,7 +553,7 @@ class Dcel:
         if axis is not None:
             ax = axis
 
-        # self.add_text_to_plot(ax)
+        self.add_text_to_plot(ax)
 
         for face in self.faces:
             if face.tag in [ROAD, JUNCTION]:
@@ -776,112 +793,50 @@ class Dcel:
 
             return closest_point
 
+        def get_potential_closest_curves(starting_face):
+            potential_curves = []
+            for adj_face in face.adjacent_faces:
+                if adj_face != starting_face:
+                    potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
+                    potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
+            return potential_curves
+
+        def connect_curves(curve1, curve2):
+            if interpolate:
+                interpolated_curve = get_interpolated_curve(curve1, curve2, no_of_points)
+                face.lane_curves.append(interpolated_curve)
+            else:
+                closest_point1 = find_closest_point(LineString(curve1), face.polygon)
+                closest_point2 = find_closest_point(LineString(curve2), face.polygon)
+                face.lane_curves.append([closest_point1, closest_point2])
+
+        def connect_curves_sets(first_curve_index):
+            potential_curves = get_potential_closest_curves(starting_face)
+            current_curve = starting_face.lane_curves[first_curve_index]
+            master_curve = current_curve
+            master_next_curve = starting_face.lane_curves[1 if first_curve_index == 0 else 2]
+            for _ in range(len(face.adjacent_faces) - 1):
+                closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve),
+                                                                             potential_curves)
+                next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
+
+                connect_curves(master_curve, closest_curve)
+                connect_curves(master_curve, next_curve)
+                connect_curves(master_next_curve, closest_curve)
+                connect_curves(master_next_curve, next_curve)
+
+                current_curve = closest_face.lane_curves[3 if index == 0 else 0]
+                potential_curves = get_potential_closest_curves(closest_face)
+
+        interpolate = True
+        no_of_points = 10
+
         for face in self.faces:
             if face.tag == JUNCTION:
                 for i in range(len(face.adjacent_faces)):
-                    first_face = face.adjacent_faces[i]
-                    # visited_faces.append(first_face)
-                    potential_curves = []
-                    for adj_face in face.adjacent_faces:
-                        if adj_face != first_face:
-                            potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
-                            potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-                    current_curve = first_face.lane_curves[0]
-                    master_curve = current_curve
-                    for _ in range(len(face.adjacent_faces) - 1):
-
-                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve),
-                                                                                     potential_curves)
-                        # if closest_face in visited_faces:
-                        #     continue
-                        next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
-
-                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
-                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(master_curve, closest_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
-                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[1]), face.polygon)
-                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[1], closest_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[1]), face.polygon)
-                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[1], next_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        current_curve = closest_face.lane_curves[3] if index == 0 else closest_face.lane_curves[0]
-
-                        potential_curves.clear()
-                        for adj_face in face.adjacent_faces:
-                            if adj_face != closest_face:
-                                potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
-                                potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-                    potential_curves.clear()
-                    for adj_face in face.adjacent_faces:
-                        if adj_face != first_face:
-                            potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
-                            potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-                    current_curve = first_face.lane_curves[3]
-                    master_curve = current_curve
-                    for _ in range(len(face.adjacent_faces) - 1):
-                        closest_curve, closest_face, index = find_closest_lane_curve(LineString(current_curve),
-                                                                                     potential_curves)
-                        next_curve = closest_face.lane_curves[1] if index == 0 else closest_face.lane_curves[2]
-
-                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
-                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(master_curve, closest_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(master_curve), face.polygon)
-                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(master_curve, next_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
-                        closest_point2 = find_closest_point(LineString(closest_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[2], closest_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        closest_point1 = find_closest_point(LineString(first_face.lane_curves[2]), face.polygon)
-                        closest_point2 = find_closest_point(LineString(next_curve), face.polygon)
-
-                        # interpolated_curve = get_interpolated_curve(first_face.lane_curves[2], next_curve)
-                        # face.lane_curves.append(interpolated_curve)
-                        face.lane_curves.append([closest_point1, closest_point2])
-
-                        current_curve = closest_face.lane_curves[3] if index == 0 else closest_face.lane_curves[0]
-
-                        potential_curves.clear()
-                        for adj_face in face.adjacent_faces:
-                            if adj_face != closest_face:
-                                potential_curves.append([adj_face, 0, adj_face.lane_curves[0]])
-                                potential_curves.append([adj_face, 3, adj_face.lane_curves[3]])
-
-        for face in self.faces:
-            if face.tag == JUNCTION:
+                    starting_face = face.adjacent_faces[i]
+                    connect_curves_sets(first_curve_index=0)
+                    connect_curves_sets(first_curve_index=3)
                 face.set_junction_curves_direction()
+
+

@@ -22,10 +22,19 @@ params = {
     "dt": 0.01,
     "D_PER_ACC_WEIGHT": 20,
     "P_PER_ACC_WEIGHT": 10,
-    "P_PARALLEL_DEC_WEIGHT": 10,
+    "P_PARALLEL_DEC_WEIGHT": 5,
     "P_PARALLEL_ACC_WEIGHT": 0.5,
     "angle_threshold": 2.5
 }
+
+
+class Lookahead:
+    def __init__(self, time=None, distance=None, point=None, angle=None, error=None):
+        self.time = time
+        self.distance = distance
+        self.point = point
+        self.angle = angle
+        self.error = error
 
 
 class Vehicle:
@@ -33,8 +42,6 @@ class Vehicle:
     def __init__(self, length, width, centroid, angle, velocity, acceleration, reference_track=None):
 
         # parameters
-        self.lookahead_distance = 10
-        self.lookahead_time = 1.5
         self.angle_threshold = params["angle_threshold"]
         self.initial_speed = velocity.norm()
         self.length = length
@@ -49,7 +56,8 @@ class Vehicle:
         # state variables
         self.centroid = centroid
         self.front_mid_point = None
-        self.lookahead_point = None
+        self.speed_lookahead = Lookahead(time=3)
+        self.turning_lookahead = Lookahead(time=1.5, distance=15)
         self.closest_point = None
         self.angle = angle
         self.velocity = velocity
@@ -84,8 +92,8 @@ class Vehicle:
         ]
 
     def set_perpendicular_acc(self):
-        proportional_error = self.error
-        derivative_error = self.error - self.prev_error
+        proportional_error = self.turning_lookahead.error
+        derivative_error = self.turning_lookahead.error - self.prev_error
 
         perpendicular_acc_magnitude = (params["P_PER_ACC_WEIGHT"] * proportional_error) + \
                                     (params["D_PER_ACC_WEIGHT"] * derivative_error)
@@ -98,8 +106,8 @@ class Vehicle:
             self.perpendicular_acc = geometry.get_vector(0, 0)
 
     def set_parallel_acc(self):
-        if abs(self.lookahead_angle) > radians(params["angle_threshold"]):
-            dec_magnitude = (self.lookahead_angle - radians(params["angle_threshold"])) * (-params["P_PARALLEL_DEC_WEIGHT"])
+        if abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
+            dec_magnitude = (self.speed_lookahead.angle - radians(params["angle_threshold"])) * (-params["P_PARALLEL_DEC_WEIGHT"])
             self.parallel_acc_sign = -1 if dec_magnitude * (-params["P_PARALLEL_DEC_WEIGHT"]) < 0 else 1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
         else:
@@ -118,9 +126,9 @@ class Vehicle:
     def set_velocity(self):
         acc = self.controller()
         self.velocity += (acc * params["dt"])
-        if self.velocity.norm() < 0.5:
-            self.velocity = self.velocity / self.velocity.norm()
-            self.velocity = self.velocity * 0.5
+        # if self.velocity.norm() < 0.5:
+        #     self.velocity = self.velocity / self.velocity.norm()
+        #     self.velocity = self.velocity * 0.5
         self.velocity = geometry.keep_in_limit(self.velocity, self.speed_limit)
 
     def set_centroid(self):
@@ -130,41 +138,28 @@ class Vehicle:
         projected_point_distance = self.reference_track.project(self.front_mid_point)
         self.closest_point = self.reference_track.interpolate(projected_point_distance)
 
-    def set_lookahead_point(self):
-        """ Creates a circle with center at car centroid and radius equal to lookahead distance.
-            Finds the intersection points of the circle and track.
-            Returns the intersection point closest to the car's velocity vector
-        """
+    def get_circle_intersection_point(self, circle_radius):
         circle_center = self.front_mid_point
-        circle_radius = self.lookahead_distance
         vel_vector = Point(self.velocity.get_x(), self.velocity.get_y())
         circle = circle_center.buffer(circle_radius)  # Create a circle geometry
         boundary = circle.boundary  # Get the boundary of the circle
         intersection = boundary.intersection(self.reference_track)
         if intersection.is_empty:
             closest_point, _ = nearest_points(self.reference_track, self.front_mid_point)
-            self.lookahead_point = closest_point
-            return
-        # Translate the velocity vector to car centroid
+            return closest_point
         vel_vector = Point(vel_vector.x + circle_center.x, vel_vector.y + circle_center.y)
         # If multiple intersection points exist, find the one closest to the velocity vector
         if intersection.geom_type == 'MultiPoint':
             intersection = nearest_points(vel_vector, intersection)[1]
-        self.lookahead_point = intersection
+        return intersection
 
-    def set_lookahead_point2(self):
-        car_line = LineString(self.get_car_perpendicular_line())
-        circle_center = self.front_mid_point
-        radius = self.lookahead_distance
-        vel_vector = Point(self.velocity.x, self.velocity.y)
-        vel_vector = Point(vel_vector.x + circle_center.x, vel_vector.y + circle_center.y)
-        velocity_line = LineString([(circle_center.x, circle_center.y), (vel_vector.x, vel_vector.y)])
-        extended_velocity_line = velocity_line.parallel_offset(radius + 20, 'right')
-        semicircle = circle_center.buffer(radius, 0, 180)
-        intersection_points = semicircle.intersection(extended_velocity_line)
-        end_point = velocity_line.coords[-1]
-        farthest_point = max(intersection_points, key=lambda p: p.distance(Point(end_point)))
-        return farthest_point
+    def set_lookahead_points(self, ):
+        """ Creates a circle with center at car centroid and radius equal to lookahead distance.
+            Finds the intersection points of the circle and track.
+            Returns the intersection point closest to the car's velocity vector
+        """
+        self.speed_lookahead.point = self.get_circle_intersection_point(self.speed_lookahead.distance)
+        self.turning_lookahead.point = self.get_circle_intersection_point(self.turning_lookahead.distance)
 
     def set_orientation(self):
         self.angle = math.atan2(self.velocity.get_y(), self.velocity.get_x())
@@ -173,7 +168,8 @@ class Vehicle:
         self.prev_error = self.error
 
     def set_lookahead_distance(self):
-        self.lookahead_distance = self.velocity.norm() * self.lookahead_time
+        # self.turning_lookahead.distance = self.velocity.norm() * self.turning_lookahead.time
+        self.speed_lookahead.distance = self.velocity.norm() * self.speed_lookahead.time
 
     def set_prev_face(self):
         self.prev_face = self.current_face
@@ -182,9 +178,10 @@ class Vehicle:
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
         self.set_lookahead_distance()
-        self.set_lookahead_point()
+        self.set_lookahead_points()
         self.set_prev_error()
-        self.set_error()
+        self.set_per_acc_error()
+        self.set_parallel_acc_error()
         self.set_velocity()
         self.set_centroid()
         self.set_orientation()
@@ -210,11 +207,13 @@ class Vehicle:
         segment = self.get_car_perpendicular_line()
         self.front_mid_point = Point((segment[0][0] + segment[1][0]) / 2, (segment[0][1] + segment[1][1]) / 2)
 
-    def get_lookahead_angle_magnitude(self):
+    def get_lookahead_angle_magnitude(self, angle_type):
         """Returns lookahead angle magnitude in radians"""
         headed_direction = (self.front_mid_point, Point(self.velocity.x + self.front_mid_point.x, self.velocity.y + self.front_mid_point.y))
-        track_direction = (self.front_mid_point, self.lookahead_point)
-
+        if angle_type == "turning":
+            track_direction = (self.front_mid_point, self.turning_lookahead.point)
+        else:
+            track_direction = (self.front_mid_point, self.speed_lookahead.point)
         vector1 = Point(headed_direction[1].x - headed_direction[0].x, headed_direction[1].y - headed_direction[0].y)
         vector2 = Point(track_direction[1].x - track_direction[0].x, track_direction[1].y - track_direction[0].y)
 
@@ -227,21 +226,31 @@ class Vehicle:
         cos_theta = min(cos_theta, 1)
         return math.acos(cos_theta)
 
-    def get_error_sign(self):
+    def get_error_sign(self, error_type):
+        # returns sign of perpendicular acceleration error term
         segment_point_1 = Point(self.front_mid_point.x, self.front_mid_point.y)
         segment_point_2 = Point(self.velocity.get_x() + self.front_mid_point.x, self.velocity.get_y() + self.front_mid_point.y)
 
         # translating the points to origin
-        lookahead_point = Point(self.lookahead_point.x - segment_point_1.x, self.lookahead_point.y - segment_point_1.y)
+        if error_type == "turning":
+            lookahead_point = Point(self.turning_lookahead.point.x - segment_point_1.x,
+                                    self.turning_lookahead.point.y - segment_point_1.y)
+        else:
+            lookahead_point = Point(self.speed_lookahead.point.x - segment_point_1.x,
+                                    self.speed_lookahead.point.y - segment_point_1.y)
         segment_point_2 = Point(segment_point_2.x - segment_point_1.x, segment_point_2.y - segment_point_1.y)
 
         cross_product = segment_point_2.x * lookahead_point.y - segment_point_2.y * lookahead_point.x
 
         return -1 if cross_product > 0 else 1
 
-    def set_error(self):
-        self.lookahead_angle = self.get_lookahead_angle_magnitude()
-        self.error = self.lookahead_angle * self.get_error_sign()
+    def set_per_acc_error(self):
+        self.turning_lookahead.angle = self.get_lookahead_angle_magnitude("turning")
+        self.turning_lookahead.error = self.turning_lookahead.angle * self.get_error_sign("turning")
+
+    def set_parallel_acc_error(self):
+        self.speed_lookahead.angle = self.get_lookahead_angle_magnitude("speed")
+        self.speed_lookahead.error = self.lookahead_angle * self.get_error_sign("speed")
 
     def set_current_face(self, road_network):
         vehicle_x, vehicle_y = self.front_mid_point.x, self.front_mid_point.y
