@@ -835,7 +835,7 @@ class Dcel:
             if face.tag == JUNCTION:
                 for i in range(len(face.adjacent_faces)):
                     starting_face = face.adjacent_faces[i]
-                    connect_curves_sets(first_curve_index=0)
+                    connect_curves_sets(first_curve_index=0)  # connects sets
                     connect_curves_sets(first_curve_index=3)
                 face.set_junction_curves_direction()
 

@@ -22,7 +22,7 @@ params = {
     "dt": 0.01,
     "D_PER_ACC_WEIGHT": 20,
     "P_PER_ACC_WEIGHT": 10,
-    "P_PARALLEL_DEC_WEIGHT": 5,
+    "P_PARALLEL_DEC_WEIGHT": 10,
     "P_PARALLEL_ACC_WEIGHT": 0.5,
     "angle_threshold": 2.5
 }
@@ -57,7 +57,7 @@ class Vehicle:
         self.centroid = centroid
         self.front_mid_point = None
         self.speed_lookahead = Lookahead(time=3)
-        self.turning_lookahead = Lookahead(time=1.5, distance=15)
+        self.turning_lookahead = Lookahead(time=1.5, distance=self.goal_speed * self.speed_lookahead.time - 5)
         self.closest_point = None
         self.angle = angle
         self.velocity = velocity
@@ -168,7 +168,7 @@ class Vehicle:
         self.prev_error = self.error
 
     def set_lookahead_distance(self):
-        # self.turning_lookahead.distance = self.velocity.norm() * self.turning_lookahead.time
+        self.turning_lookahead.distance = self.velocity.norm() * self.turning_lookahead.time
         self.speed_lookahead.distance = self.velocity.norm() * self.speed_lookahead.time
 
     def set_prev_face(self):

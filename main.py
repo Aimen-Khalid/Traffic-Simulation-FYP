@@ -75,7 +75,10 @@ def create_track(file_name, new):
         track, _ = get_vertices_and_segments()
         track.append(track[0])
         files_functions.write_vertices_to_file(track, file_name)
-    track = files_functions.load_vertices_from_file(file_name)
+    try:
+        track = files_functions.load_vertices_from_file(file_name)
+    except Exception as e:
+        print(e)
     # return LineString([(2, -7), (35, 8), (55, 12), (75, 15), (95, 10), (115, 8), (135, 9), (150, 12), (170, 20)])
     # return LineString([(2, 7), (30, 8), (60, 20), (90, 7), (120, 6), (150, 3), (180, 2), (220, 50), (250, 20)])
     return LineString(track)
@@ -94,8 +97,8 @@ def road_network_main(fn, new):
 
 def simulation_main():
     frames = 3500
-    track = create_track("track", new=False)
-    road_network = get_saved_road_network("test")
+    track = create_track("triangle", new=False)
+    road_network = get_saved_road_network("single_junction")
     st_face = road_network.faces[0]
 
     reference_track = track#LineString(st_face.lane_curves[0])
@@ -110,5 +113,5 @@ def simulation_main():
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 
-road_network_main("single_junction", new=False)
-# simulation_main()
+# road_network_main("single_junction", new=False)
+simulation_main()
