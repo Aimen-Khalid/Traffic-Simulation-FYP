@@ -81,22 +81,22 @@ def get_interpolated_curve(line_string1, line_string2, limit):
 
     return list(filtered_line_string.coords)
 
-
-l1 = [[21, 38], [72, 89]]
-l2 = [[96, 115], [38, 146]]
-x = [l1[0][0], l1[1][0]]
-y = [l1[0][1], l1[1][1]]
-plt.plot(x, y)
-
-x = [l2[0][0], l2[1][0]]
-y = [l2[0][1], l2[1][1]]
-plt.plot(x, y)
-
-limit = 10
-curve = get_interpolated_curve(l2, l1, limit)
-x = [curve[i][0] for i in range(len(curve))]
-y = [curve[i][1] for i in range(len(curve))]
-
-plt.plot(x, y, 'b')
-plt.scatter(x, y, color='r')
-plt.show()
+#
+# l1 = [[21, 38], [72, 89]]
+# l2 = [[96, 115], [38, 146]]
+# x = [l1[0][0], l1[1][0]]
+# y = [l1[0][1], l1[1][1]]
+# plt.plot(x, y)
+#
+# x = [l2[0][0], l2[1][0]]
+# y = [l2[0][1], l2[1][1]]
+# plt.plot(x, y)
+#
+# limit = 10
+# curve = get_interpolated_curve(l2, l1, limit)
+# x = [curve[i][0] for i in range(len(curve))]
+# y = [curve[i][1] for i in range(len(curve))]
+#
+# plt.plot(x, y, 'b')
+# plt.scatter(x, y, color='r')
+# plt.show()

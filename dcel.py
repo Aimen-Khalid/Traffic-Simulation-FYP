@@ -8,7 +8,9 @@ import shapely
 from geometry import get_intersection_point, lane_width
 from generic_interpolation import get_interpolated_curve
 from graph_to_road_network import get_translated_vertices_segments, translate_segment
+import networkx as nx
 import matplotlib.lines as mlines
+import car
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -40,6 +42,12 @@ def get_angle(line):
     dy = line.coords[end_index][1] - line.coords[st_index][1]
     length = m.sqrt(dx * dx + dy * dy)
     return m.degrees(m.acos(dx / length) if dy > 0 else 2 * m.pi - m.acos(dx / length))
+
+
+def get_node_from_graph(graph, attribute, value):
+    matching_nodes = [node for node, attributes in graph.nodes(data=True) if
+            attributes.get(attribute) == value]
+    return matching_nodes[0]
 
 
 def is_parallel(edge, lane_curve):
@@ -553,7 +561,7 @@ class Dcel:
         if axis is not None:
             ax = axis
 
-        self.add_text_to_plot(ax)
+        # self.add_text_to_plot(ax)
 
         for face in self.faces:
             if face.tag in [ROAD, JUNCTION]:
@@ -828,15 +836,60 @@ class Dcel:
                 current_curve = closest_face.lane_curves[3 if index == 0 else 0]
                 potential_curves = get_potential_closest_curves(closest_face)
 
-        interpolate = True
+        interpolate = False
         no_of_points = 10
 
         for face in self.faces:
             if face.tag == JUNCTION:
                 for i in range(len(face.adjacent_faces)):
                     starting_face = face.adjacent_faces[i]
-                    connect_curves_sets(first_curve_index=0)  # connects sets
+                    connect_curves_sets(first_curve_index=0)  # connects sets of two lane curves having same direction
                     connect_curves_sets(first_curve_index=3)
                 face.set_junction_curves_direction()
+
+    def get_track(self, start_node_id, end_node_id):
+        def get_lane_curve(target_point, lane_curves_list):
+            min_distance = float('inf')
+            closest_lane_curve = None
+            index = None
+            for i, lane_curve in enumerate(lane_curves_list):
+                distance = Point(target_point).distance(Point(lane_curve[0]))
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_lane_curve = lane_curve
+                    index = i
+            if index == 1:
+                return lane_curves_list[0]
+            if index == 2:
+                return lane_curves_list[3]
+            return lane_curves_list[index]
+
+        track = LineString([])
+        start_node = get_node_from_graph(self.graph, 'id', start_node_id)
+        end_node = get_node_from_graph(self.graph, 'id', end_node_id)
+        shortest_path_nodes = nx.shortest_path(self.graph, start_node, end_node)
+        face_sequence = []
+        for i, node in enumerate(shortest_path_nodes[:-1]):
+
+            mid_point = ((shortest_path_nodes[i][0] + shortest_path_nodes[i+1][0])/2,
+                         (shortest_path_nodes[i][1] + shortest_path_nodes[i+1][1])/2)
+            face = self.get_face_for_point(mid_point)
+            face_sequence.append((face, node))
+
+            end_node = shortest_path_nodes[i+1]
+            if self.graph.degree[end_node] > 4:
+                face = self.get_face_for_point(end_node)
+                face_sequence.append((face, end_node))
+
+        for i, (face, node) in enumerate(face_sequence):
+            if face.tag == ROAD:
+                face_curve = get_lane_curve(node, face.lane_curves)
+                track = car.merge_line_strings(LineString(track), LineString(face_curve))
+            if face.tag == JUNCTION:
+                start_point = track.coords[-1]
+                end_point = get_lane_curve(node, face_sequence[i+1][0].lane_curves)[0]
+                track = car.merge_line_strings(LineString(track), LineString([start_point, end_point]))
+        return track
+
 
 

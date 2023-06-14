@@ -236,10 +236,10 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
     ax.axis("off")
     ax.set_aspect('equal', adjustable='box')
 
-    # road_network.show_road_network(ax)
+    road_network.show_road_network(ax)
 
     x, y = vehicle.reference_track.xy
-    plt.plot(x, y)
+    ax.plot(x, y)
 
     vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, turning_track_line, speed_track_line, trail_line, \
         turning_lookahead_point, speed_lookahead_point, turning_circle, speed_circle = get_artist_objects(ax)
@@ -275,11 +275,11 @@ def simulate(road_network, vehicle, frames, parameters, file_name):  # reference
         speed_track_line.set_data(x, y)
 
         window_size = 40
-        text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
-        x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid'])))
-        y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid'])))
-        text.set_position((x, y))
-        text.set_text(parameters['text'][i])
+        # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
+        # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid'])))
+        # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid'])))
+        # text.set_position((x, y))
+        # text.set_text(parameters['text'][i])
 
         # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
         # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)

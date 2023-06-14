@@ -74,8 +74,8 @@ def create_graph_from_files(vertices_fn, segments_fn):
     segments_ = load_segments_from_file(segments_fn)
 
     # Add nodes to the graph with their specific positions
-    for vertex in vertices_:
-        graph.add_node(vertex, pos=vertex)
+    for i, vertex in enumerate(vertices_):
+        graph.add_node(vertex, pos=vertex, id=i)
     # Add edges to the graph
     for segment in segments_:
         graph.add_edge(segment[0], segment[1], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None, lane_width=lane_width)

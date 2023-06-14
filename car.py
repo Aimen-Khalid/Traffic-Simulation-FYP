@@ -56,7 +56,7 @@ class Vehicle:
         # state variables
         self.centroid = centroid
         self.front_mid_point = None
-        self.speed_lookahead = Lookahead(time=3)
+        self.speed_lookahead = Lookahead(time=1.5)
         self.turning_lookahead = Lookahead(time=1.5, distance=self.goal_speed * self.speed_lookahead.time - 5)
         self.closest_point = None
         self.angle = angle

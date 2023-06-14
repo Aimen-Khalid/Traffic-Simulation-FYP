@@ -18,9 +18,9 @@ https://drive.google.com/file/d/1s4K-4sUjk51QQ3viBoLcKz9DzYK-8FNi/view?usp=shari
 
 def show_graph(graph):
     node_positions = nx.get_node_attributes(graph, 'pos')
-    # Add node labels with coordinates
+    node_ids = nx.get_node_attributes(graph, 'id')
     for node, (x, y) in node_positions.items():
-        plt.text(x, y, f'({x}, {y})', fontsize=8, ha='center', va='center')
+        plt.text(x, y, str(node_ids[node]), fontsize=12, ha='center', va='center')
     nx.draw(graph, pos=node_positions, node_size=5, font_size=8, with_labels=False)
     plt.show()
 
@@ -47,14 +47,17 @@ def show_saved_road_network(area_name):
     # show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
+
     dcel_obj.show_road_network()
 
 
-def get_saved_road_network(area_name):
+def get_road_network(area_name, new):
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
+    if new:
+        draw_and_save_road_network_graph(vertices_fn, segments_fn)
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
-    # show_graph(graph)
+    show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
     return dcel_obj
@@ -68,6 +71,7 @@ def create_own_road_network(fn):
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
     dcel_obj.show_road_network()
+    return dcel_obj
 
 
 def create_track(file_name, new):
@@ -96,12 +100,12 @@ def road_network_main(fn, new):
 
 
 def simulation_main():
-    frames = 3500
-    track = create_track("triangle", new=False)
-    road_network = get_saved_road_network("single_junction")
+    frames = 50
+    # track = create_track("shift_test", new=False)
+    road_network = get_road_network("path_testing", new=False)
     st_face = road_network.faces[0]
 
-    reference_track = track#LineString(st_face.lane_curves[0])
+    reference_track = road_network.get_track(8, 6) #track  # LineString(st_face.lane_curves[0])
 
     vehicle = car.Vehicle(length=4, width=2,
                           centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
@@ -113,5 +117,31 @@ def simulation_main():
     simulation.create_simulation_video(vehicle, road_network, frames)
 
 
-# road_network_main("single_junction", new=False)
+# road_network_main("path_testing", new=True)
 simulation_main()
+
+
+# G = files_functions.create_graph_from_files("path_testing_vertices.txt", "path_testing_segments.txt")
+# dcel_obj = dcel.Dcel(G)
+# dcel_obj.build_dcel(G)
+# # dcel_obj.show_road_network()
+# print(dcel_obj.get_track(0, 13))
+
+# start_node = dcel.get_node_from_graph(G, 'id', 0)
+# end_node = dcel.get_node_from_graph(G, 'id', 2)
+# # print(start_node, end_node)
+#
+# shortest_path = nx.shortest_path(G, start_node, end_node)
+# print("Shortest path:", shortest_path)
+# print("\n", shortest_path[0])
+#
+# # Access the first node
+# first_node = next(iter(G.nodes))
+# # print("first node ", first_node)
+#
+# # Retrieve attributes of the first node
+# attributes = G.nodes[first_node]
+#
+# # print("Attributes of the first node:")
+# # print(G.edges)
+# show_graph(G)
