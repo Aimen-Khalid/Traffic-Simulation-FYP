@@ -1,7 +1,7 @@
 import osmnx
 from shapely import Polygon
 import networkx as nx
-from geometry import lane_width
+from .geometry import lane_width
 
 
 def write_vertices_to_file(vertices, file_name):

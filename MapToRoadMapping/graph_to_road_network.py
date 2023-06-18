@@ -1,10 +1,18 @@
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+sys.path.append(parent_dir)
+
 import math
 from shapely import Point, LineString
-import files_functions
+from Utility import files_functions
 import networkx as nx
 # from rtree import index
-import geometry
+from Utility import geometry
 import matplotlib.pyplot as plt
+import TextFiles
 
 
 def translate_segment(segment, length, anticlockwise=False):
@@ -225,3 +233,14 @@ def get_translated_vertices_segments(graph):
     unique_partitions = [list(segment) for segment in unique_partitions]
     segments.extend(unique_partitions)
     return vertices, segments
+
+
+def main():
+    fn = "squares"
+    vertices_fn = f"{fn}_vertices.txt"
+    segments_fn = f"{fn}_segments.txt"
+    graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
+    show_graph_lanes(graph)
+
+
+# main()

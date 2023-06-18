@@ -5,12 +5,11 @@ import random
 import matplotlib.pyplot as plt
 import traceback
 import shapely
-from geometry import get_intersection_point, lane_width
-from generic_interpolation import get_interpolated_curve
-from graph_to_road_network import get_translated_vertices_segments, translate_segment
+from Utility.geometry import get_intersection_point, lane_width, merge_line_strings
+from .generic_interpolation import get_interpolated_curve
+from .graph_to_road_network import get_translated_vertices_segments, translate_segment
 import networkx as nx
 import matplotlib.lines as mlines
-import car
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -71,7 +70,8 @@ class Face:
         self.lane_separators = []
         self.lane_curves = []
 
-    def get_face_vertices(self):  # returns vertices of outer boundary of face
+    def get_face_vertices(self):
+        """Returns vertices of outer boundary of face"""
         hedge = self.outer_component
         face_vertices = [[hedge.origin.x, hedge.origin.y]]
         hedge = hedge.next
@@ -80,7 +80,8 @@ class Face:
             hedge = hedge.next
         return face_vertices
 
-    def get_face_hedges(self):  # returns hedges of outer boundary of face along with hedges of inside faces
+    def get_face_hedges(self):
+        # returns hedges of outer boundary of face along with hedges of inside faces
         hedges = []
         h = self.outer_component.twin
         while h.next != self.outer_component.twin:
@@ -373,30 +374,25 @@ class Dcel:
         self.__set_hedges_direction()
         self.__set_faces_inside_faces()
         self.__set_face_tags()
-        self.__set_edge_tags()
+        self.__set_edges_tags()
         self.__set_faces_curves()
         self.__set_adjacent_faces()
         self.__set_junctions_curves()
-
 
     def build_dcel_primary(self, points, segments):
         self.__add_points(points)
         self.__add_edges_and_twins(segments)
         self.__add_next_and_previous_pointers()
 
-    def __set_edge_tags(self):
+    def __set_edges_tags(self):
         for edge in self.edges:
             if edge.tag is not None:
                 continue
             if edge.right_arrow.incident_face.tag in [ROAD, JUNCTION] and \
                     edge.left_arrow.incident_face.tag in [ROAD, JUNCTION]:
-                edge.tag = PARTITION
-                edge.left_arrow.tag = PARTITION
-                edge.right_arrow.tag = PARTITION
+                edge.tag = edge.left_arrow.tag = edge.right_arrow.tag = PARTITION
             else:
-                edge.tag = BOUNDARY
-                edge.left_arrow.tag = BOUNDARY
-                edge.right_arrow.tag = BOUNDARY
+                edge.tag = edge.left_arrow.tag = edge.right_arrow.tag = BOUNDARY
 
     def __set_adjacent_faces(self):
         for face in self.faces:
@@ -849,6 +845,8 @@ class Dcel:
 
     def get_track(self, start_node_id, end_node_id):
         def get_lane_curve(target_point, lane_curves_list):
+            """Returns that outer-most lane curve from lane_curves_list the origin of which
+            is closest to the target point"""
             min_distance = float('inf')
             closest_lane_curve = None
             index = None
@@ -864,31 +862,38 @@ class Dcel:
                 return lane_curves_list[3]
             return lane_curves_list[index]
 
-        track = LineString([])
+        def get_face_sequence():
+            face_sequence = []
+            for i, node in enumerate(shortest_path_nodes[:-1]):
+                mid_point = ((shortest_path_nodes[i][0] + shortest_path_nodes[i + 1][0]) / 2,
+                             (shortest_path_nodes[i][1] + shortest_path_nodes[i + 1][1]) / 2)
+                face = self.get_face_for_point(mid_point)
+                face_sequence.append((face, node))
+
+                # Check if end point of the segment is contained in a junction
+                end_node = shortest_path_nodes[i + 1]
+                if self.graph.degree[end_node] > 4:
+                    face = self.get_face_for_point(end_node)
+                    face_sequence.append((face, end_node))
+            return face_sequence
+
+        def create_track_from_faces(face_sequence):
+            track = LineString([])
+            for i, (face, node) in enumerate(face_sequence):
+                if face.tag == ROAD:
+                    face_curve = get_lane_curve(node, face.lane_curves)
+                    track = merge_line_strings(LineString(track), LineString(face_curve))
+                if face.tag == JUNCTION:
+                    start_point = track.coords[-1]
+                    end_point = get_lane_curve(node, face_sequence[i + 1][0].lane_curves)[0]
+                    track = merge_line_strings(LineString(track), LineString([start_point, end_point]))
+            return track
+
         start_node = get_node_from_graph(self.graph, 'id', start_node_id)
         end_node = get_node_from_graph(self.graph, 'id', end_node_id)
         shortest_path_nodes = nx.shortest_path(self.graph, start_node, end_node)
-        face_sequence = []
-        for i, node in enumerate(shortest_path_nodes[:-1]):
-
-            mid_point = ((shortest_path_nodes[i][0] + shortest_path_nodes[i+1][0])/2,
-                         (shortest_path_nodes[i][1] + shortest_path_nodes[i+1][1])/2)
-            face = self.get_face_for_point(mid_point)
-            face_sequence.append((face, node))
-
-            end_node = shortest_path_nodes[i+1]
-            if self.graph.degree[end_node] > 4:
-                face = self.get_face_for_point(end_node)
-                face_sequence.append((face, end_node))
-
-        for i, (face, node) in enumerate(face_sequence):
-            if face.tag == ROAD:
-                face_curve = get_lane_curve(node, face.lane_curves)
-                track = car.merge_line_strings(LineString(track), LineString(face_curve))
-            if face.tag == JUNCTION:
-                start_point = track.coords[-1]
-                end_point = get_lane_curve(node, face_sequence[i+1][0].lane_curves)[0]
-                track = car.merge_line_strings(LineString(track), LineString([start_point, end_point]))
+        face_sequence = get_face_sequence()
+        track = create_track_from_faces(face_sequence)
         return track
 
 

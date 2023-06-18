@@ -35,3 +35,10 @@ def get_coordinates_from_map():
     coordinates = data['features'][0]['geometry']['coordinates'][0]
     return coordinates
 
+
+def main():
+    coordinates = get_coordinates_from_map()
+    print("Coordinates picked from map: ", coordinates)
+
+
+# main()

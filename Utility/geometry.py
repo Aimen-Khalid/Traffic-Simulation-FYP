@@ -1,10 +1,17 @@
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+sys.path.append(parent_dir)
+
 import math
 from math import cos, sin, radians
 from shapely import LineString, Point
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-from point import ScaledPoint
+from .point import ScaledPoint
 lane_width = 8
 
 
@@ -243,4 +250,10 @@ def keep_in_limit(vector, limit):
         vector /= vector.norm()
         vector *= limit
     return vector
+
+
+def merge_line_strings(l1, l2):
+    coords = list(l1.coords)[:-1]
+    coords.extend(list(l2.coords))
+    return LineString(coords)
 

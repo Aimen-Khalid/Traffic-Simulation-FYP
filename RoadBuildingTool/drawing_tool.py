@@ -1,5 +1,12 @@
+import os
+import sys
 import matplotlib.pyplot as plt
-import files_functions
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+sys.path.append(parent_dir)
+
+from Utility import files_functions
 
 
 def get_vertices_and_segments():
@@ -83,3 +90,16 @@ def draw_and_save_road_network_graph(vertices_file_name, segments_file_name):
     vertices, segments = get_vertices_and_segments()
     files_functions.write_vertices_to_file(vertices, vertices_file_name)
     files_functions.write_segments_to_file(segments, segments_file_name)
+
+
+def main():
+    graph_name = "graph"
+    vertices_fn = f"{graph_name}_vertices.txt"
+    segments_fn = f"{graph_name}_segments.txt"
+    draw_and_save_road_network_graph(vertices_fn, segments_fn)
+    print(
+        f"Graph's vertices and segments have been written to {segments_fn}and {vertices_fn}respectively."
+    )
+
+
+# main()
