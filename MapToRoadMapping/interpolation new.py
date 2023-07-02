@@ -1,7 +1,9 @@
+from shapely.geometry import box
 import numpy as np
 from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from shapely import Point, LineString
+from shapely.geometry import Polygon
 
 
 def rearrange_line_strings(line1, line2):
@@ -38,7 +40,6 @@ def rearrange_line_strings(line1, line2):
 
     return line1, line2
 
-    
 
 def path_interpolation(l1, l2, num_points=1000):
     # Combine the points from l1 and l2
@@ -56,12 +57,32 @@ def path_interpolation(l1, l2, num_points=1000):
     cs_x = CubicSpline(distance, x)
     cs_y = CubicSpline(distance, y)
 
-    # Create new distance values
-    distance_new = np.linspace(distance.min(), distance.max(), num_points)
+    # Create new distance values, skip the start and end points by a tiny amount
+    distance_new = np.linspace(
+        distance.min() + 1e-10, distance.max() - 1e-10, num_points)
 
     # Compute interpolated x and y values
     x_new = cs_x(distance_new)
     y_new = cs_y(distance_new)
+
+    # Create a bounding box encompassing both l1 and l2
+    min_x = min(min(point[0] for point in l1.coords),
+                min(point[0] for point in l2.coords))
+    min_y = min(min(point[1] for point in l1.coords),
+                min(point[1] for point in l2.coords))
+    max_x = max(max(point[0] for point in l1.coords),
+                max(point[0] for point in l2.coords))
+    max_y = max(max(point[1] for point in l1.coords),
+                max(point[1] for point in l2.coords))
+    bounding_box = box(min_x, min_y, max_x, max_y)
+
+    # Filter out the interpolated points that are inside the bounding box
+    points = np.array(list(zip(x_new, y_new)))
+    points_outside_box = [
+        point for point in points if not bounding_box.contains(Point(point))]
+
+    # Separate the x and y coordinates of the points outside the box
+    x_new, y_new = zip(*points_outside_box)
 
     return x_new, y_new
 
