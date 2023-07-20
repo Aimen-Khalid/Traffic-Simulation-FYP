@@ -16,7 +16,6 @@ ROAD_COLOR = 'lightgrey'
 NON_ROAD_COLOR = 'white'
 TRAIL_COLOR = 'grey'
 
-
 """For testing this module, please see simulation_main in main.py of Main module"""
 
 
@@ -208,27 +207,59 @@ def plot_parameters(vehicle, fig_name):
     plt.show()
 
 
-def get_artist_objects(ax):
-    vehicle_line, = ax.plot([], [], linewidth=0.5)
-    trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
-    acc_line, = ax.plot([], [], linewidth=0.5)
-    acc2_line, = ax.plot([], [], linewidth=0.5)
-    velocity_line, = ax.plot([], [], linewidth=0.5)
-    turning_lookahead_point = ax.scatter([], [], color='red', s=3)
-    speed_lookahead_point = ax.scatter([], [], color='green', s=3)
-    closest_point = ax.scatter([], [], color='black', s=3)
-    text = ax.text(0, 0, "", fontsize=6)
-    turning_track_line, = ax.plot([], [], linewidth=0.5, color='red')
-    speed_track_line, = ax.plot([], [], linewidth=0.5, color='green')
-    turning_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='red', facecolor='none', linewidth=0.3)
-    ax.add_patch(turning_circle)
-    speed_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='green', facecolor='none', linewidth=0.3)
-    ax.add_patch(speed_circle)
-    return vehicle_line, acc_line, acc2_line, velocity_line, closest_point, text, turning_track_line, speed_track_line, \
-        trail_line, turning_lookahead_point, speed_lookahead_point, turning_circle, speed_circle
+def get_artist_objects(ax, no_of_vehicles):
+    vehicle_lines = []
+    trail_lines = []
+    acc_lines = []
+    acc2_lines = []
+    velocity_lines = []
+    closest_points = []
+    turning_lookahead_points = []
+    speed_lookahead_points = []
+    turning_track_lines = []
+    speed_track_lines = []
+    turning_circles = []
+    speed_circles = []
+
+    for i in range(no_of_vehicles):
+        vehicle_line, = ax.plot([], [], linewidth=0.5, color='black')
+        trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
+        acc_line, = ax.plot([], [], linewidth=0.5, color='green')
+        acc2_line, = ax.plot([], [], linewidth=0.5, color='green')
+        velocity_line, = ax.plot([], [], linewidth=0.5, color='green')
+        turning_lookahead_point = ax.scatter([], [], color='red', s=3)
+        speed_lookahead_point = ax.scatter([], [], color='green', s=3)
+        closest_point = ax.scatter([], [], color='black', s=3)
+        # text = ax.text(0, 0, "", fontsize=6)
+        turning_track_line, = ax.plot([], [], linewidth=0.5, color='red')
+        speed_track_line, = ax.plot([], [], linewidth=0.5, color='green')
+        turning_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='red', facecolor='none', linewidth=0.3)
+        ax.add_patch(turning_circle)
+        speed_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='green', facecolor='none', linewidth=0.3)
+        ax.add_patch(speed_circle)
+
+        vehicle_lines.append(vehicle_line)
+        trail_lines.append(trail_line)
+        acc_lines.append(acc_line)
+        acc2_lines.append(acc2_line)
+        velocity_lines.append(velocity_line)
+        closest_points.append(closest_point)
+        turning_lookahead_points.append(turning_lookahead_point)
+        speed_lookahead_points.append(speed_lookahead_point)
+        turning_track_lines.append(turning_track_line)
+        speed_track_lines.append(speed_track_line)
+        turning_circles.append(turning_circle)
+        speed_circles.append(speed_circle)
+
+    return vehicle_lines, acc_lines, acc2_lines, velocity_lines, closest_points, turning_track_lines, speed_track_lines, \
+        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles
 
 
-def simulate(road_network, vehicle, frames, parameters, file_name, with_road_network):  # reference track
+def separate_objects(my_list):
+    yield from my_list
+
+
+def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network):  # reference track
     fig = plt.figure()
     ax = plt.gca()
     ax.axis("off")
@@ -237,41 +268,52 @@ def simulate(road_network, vehicle, frames, parameters, file_name, with_road_net
     if with_road_network:
         road_network.show_road_network(ax)
 
-    x, y = vehicle.reference_track.xy
-    ax.plot(x, y, linewidth=0.5, color='green')
+    for obstacle in obstacles:
+        x, y = obstacle.exterior.xy
+        ax.fill(x, y, color='#ff4d4d')
+        # buffer = obstacle.centroid.buffer(8)
+        # x, y = buffer.exterior.xy
+        # ax.plot(x, y, color='yellow', linewidth=0.6)
 
-    vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, turning_track_line, speed_track_line, trail_line, \
-        turning_lookahead_point, speed_lookahead_point, turning_circle, speed_circle = get_artist_objects(ax)
+
+    # x, y = vehicles[0].reference_track.xy
+    # ax.plot(x, y, linewidth=1, color='green')
+
+    vehicle_lines, acc_lines, acc2_lines, velocity_lines, closest_points, turning_track_lines, speed_track_lines, \
+        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles = get_artist_objects(ax, len(vehicles))
 
     def init():
-        return vehicle_line, perpendicular_acc_line, parallel_acc_line, velocity_line, closest_point, text, turning_track_line, speed_track_line, trail_line, \
-            turning_lookahead_point, speed_lookahead_point, turning_circle, speed_circle
+        # return vehicle_lines[0], acc_lines[0], acc2_lines[0], velocity_lines[0], closest_points[0], turning_track_lines[0], speed_track_lines[0], \
+        #     trail_lines[0], turning_lookahead_points[0], speed_lookahead_points[0], turning_circles[0], speed_circles[0]
+        return vehicle_lines[0], acc_lines[0], acc2_lines[0], velocity_lines[0], trail_lines[0]
 
     def animate(i):
-        vehicle_line.set_data(parameters['vehicle'][i])
-        velocity_line.set_data(parameters['velocity'][i])
-        trail_line.set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
-        perpendicular_acc_line.set_data(parameters['perpendicular_acc'][i])
-        parallel_acc_line.set_data(parameters['parallel_acc'][i])
-        turning_lookahead_point.set_offsets((parameters['turning_lookahead_point'][i].x,
-                                             parameters['turning_lookahead_point'][i].y))
-        speed_lookahead_point.set_offsets(
-            (parameters['speed_lookahead_point'][i].x, parameters['speed_lookahead_point'][i].y))
-        closest_point.set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
-        turning_circle.set_radius(parameters["turning_circle"][i][1])
-        turning_circle.set_center((parameters["turning_circle"][i][0].x, parameters["turning_circle"][i][0].y))
-        speed_circle.set_radius(parameters["speed_circle"][i][1])
-        speed_circle.set_center((parameters["speed_circle"][i][0].x, parameters["speed_circle"][i][0].y))
+        for j in range(len(vehicles)):
+            parameters = parameters_list[j]
+            vehicle_lines[j].set_data(parameters['vehicle'][i])
+            velocity_lines[j].set_data(parameters['velocity'][i])
+            trail_lines[j].set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
+            acc_lines[j].set_data(parameters['perpendicular_acc'][i])
+            acc2_lines[j].set_data(parameters['parallel_acc'][i])
+            # turning_lookahead_points[j].set_offsets((parameters['turning_lookahead_point'][i].x,
+            #                                          parameters['turning_lookahead_point'][i].y))
+            # speed_lookahead_points[j].set_offsets(
+            #     (parameters['speed_lookahead_point'][i].x, parameters['speed_lookahead_point'][i].y))
+            # closest_points[j].set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
+            # turning_circles[j].set_radius(parameters["turning_circle"][i][1])
+            # turning_circles[j].set_center((parameters["turning_circle"][i][0].x, parameters["turning_circle"][i][0].y))
+            # speed_circles[j].set_radius(parameters["speed_circle"][i][1])
+            # speed_circles[j].set_center((parameters["speed_circle"][i][0].x, parameters["speed_circle"][i][0].y))
 
-        start, end = parameters['turning_track_vector'][i]
-        x = [start[0], end[0]]
-        y = [start[1], end[1]]
-        turning_track_line.set_data(x, y)
+            start, end = parameters['turning_track_vector'][i]
+            x = [start[0], end[0]]
+            y = [start[1], end[1]]
+            turning_track_lines[j].set_data(x, y)
 
-        start, end = parameters['speed_track_vector'][i]
-        x = [start[0], end[0]]
-        y = [start[1], end[1]]
-        speed_track_line.set_data(x, y)
+            start, end = parameters['speed_track_vector'][i]
+            x = [start[0], end[0]]
+            y = [start[1], end[1]]
+            speed_track_lines[j].set_data(x, y)
 
         window_size = 40
         # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
@@ -283,8 +325,22 @@ def simulate(road_network, vehicle, frames, parameters, file_name, with_road_net
         # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
         # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
 
-        return vehicle_line, velocity_line, perpendicular_acc_line, parallel_acc_line, text, trail_line, turning_track_line, \
-            speed_track_line, turning_circle, speed_circle
+        return_string = ""
+        for i in range(len(vehicles)):
+            return_string += f"vehicle_lines[{i}], "
+            return_string += f"velocity_lines[{i}], "
+            return_string += f"acc_lines[{i}], "
+            return_string += f"acc2_lines[{i}], "
+            return_string += f"trail_lines[{i}], "
+            # return_string += f"turning_track_lines[{i}], "
+            # return_string += f"speed_track_lines[{i}], "
+            # return_string += f"turning_circles[{i}], "
+            # return_string += f"speed_circles[{i}], "
+
+        return eval(return_string)
+        # return separate_objects(vehicle_lines), separate_objects(velocity_lines), separate_objects(acc_lines), \
+        #     separate_objects(acc2_lines), separate_objects(trail_lines), separate_objects(turning_track_lines), \
+        #     separate_objects(speed_track_lines), separate_objects(turning_circles), separate_objects(speed_circles)
 
     print("Animation in progress...")
     start = time.time()
@@ -329,57 +385,60 @@ def calculate_tracking_accuracy(vehicle_trail, track):
     return total_distance
 
 
-def create_simulation_video(vehicle, road_network, frames, with_road_network):
-    parameters = compute_parameters(vehicle, frames)
-    write_parameters_to_file(parameters)
+def create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network):
+    parameters_list = [compute_parameters(vehicle, frames) for vehicle in vehicles]
+    plt.close('all')
+    # write_parameters_to_file(parameters)
 
-    file_name = f"p{car.params['P_PER_ACC_WEIGHT']} " \
-                f"d {car.params['D_PER_ACC_WEIGHT']} " \
-                f"acc_lim {vehicle.acc_limit} " \
-                f"init_speed {round(vehicle.initial_speed, 2)} " \
-                f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}" \
-                f"lookahead_time {vehicle.turning_lookahead.time}" \
-                f".mp4"
-
-    simulate(road_network, vehicle, frames, parameters, file_name, with_road_network)
+    # file_name = f"p{car.params['P_PER_ACC_WEIGHT']} " \
+    #             f"d {car.params['D_PER_ACC_WEIGHT']} " \
+    #             f"acc_lim {vehicle.acc_limit} " \
+    #             f"init_speed {round(vehicle.initial_speed, 2)} " \
+    #             f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}" \
+    #             f"lookahead_time {vehicle.turning_lookahead.time}" \
+    #             f".mp4"
+    file_name = "video.mp4"
+    simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network)
     winsound.Beep(frequency=2500, duration=1000)
-    plot_parameters(vehicle, fig_name=file_name)
+    # plot_parameters(vehicle, fig_name=file_name)
 
 
-def plot_vehicle_tracking(vehicle, frames, road_network=None):
-    parameters = compute_parameters(vehicle, frames)
-
+def plot_vehicle_tracking(vehicles, frames, road_network=None):
+    parameters_list = [compute_parameters(vehicle, frames) for vehicle in vehicles]
+    plt.close('all')
     fig = plt.figure()
     ax = plt.gca()
     ax.axis("off")
     ax.set_aspect('equal', adjustable='box')
 
-    trail_x = parameters['trail_x']
-    trail_y = parameters['trail_y']
-    trail = list(zip(trail_x, trail_y))
-    tracking_metric_index = calculate_tracking_accuracy(trail, vehicle.reference_track)
-    print("Tracking metric index: ", tracking_metric_index)
-    ax.plot(trail_x, trail_y, linewidth=1, color="grey")
-    track_x, track_y = vehicle.reference_track.xy
-    ax.plot(track_x, track_y, linewidth=1, color="green")
+    for i in range(len(vehicles)):
+        vehicle = vehicles[i]
+        parameters = parameters_list[i]
 
-    description = f"\nKp Per: {car.params['P_PER_ACC_WEIGHT']} " \
-                  f"   Kd per: {car.params['D_PER_ACC_WEIGHT']} " \
-                  f"   Kp parallel dec: {car.params['P_PARALLEL_DEC_WEIGHT']} " \
-                  f"   Kp parallel acc: {car.params['P_PARALLEL_ACC_WEIGHT']} " \
-                  f"\nAcc Limit: {vehicle.acc_limit} " \
-                  f"\nInit speed: {round(vehicle.initial_speed, 2)} " \
-                  f"   Goal speed: {vehicle.goal_speed} " \
-                  f"\nAngle threshold: {car.params['angle_threshold']}" \
-                  f"\nLook-ahead time: {vehicle.turning_lookahead.time}" \
-                  f"\nFrames: {frames}"
-    fig.suptitle(f"Tracking metric index: {str(round(tracking_metric_index, 2))}{description}", fontsize=8, x=0, ha='left')
+        trail_x = parameters['trail_x']
+        trail_y = parameters['trail_y']
+        trail = list(zip(trail_x, trail_y))
+        tracking_metric_index = calculate_tracking_accuracy(trail, vehicle.reference_track)
+        print("Tracking metric index: ", tracking_metric_index)
+        ax.plot(trail_x, trail_y, linewidth=1, color=vehicle.trail_color)
+        track_x, track_y = vehicle.reference_track.xy
+        ax.plot(track_x, track_y, linewidth=1, color=vehicle.track_color)
+
+    # description = f"\nKp Per: {car.params['P_PER_ACC_WEIGHT']} " \
+    #               f"   Kd per: {car.params['D_PER_ACC_WEIGHT']} " \
+    #               f"   Kp parallel dec: {car.params['P_PARALLEL_DEC_WEIGHT']} " \
+    #               f"   Kp parallel acc: {car.params['P_PARALLEL_ACC_WEIGHT']} " \
+    #               f"\nAcc Limit: {vehicle.acc_limit} " \
+    #               f"\nInit speed: {round(vehicle.initial_speed, 2)} " \
+    #               f"   Goal speed: {vehicle.goal_speed} " \
+    #               f"\nAngle threshold: {car.params['angle_threshold']}" \
+    #               f"\nLook-ahead time: {vehicle.turning_lookahead.time}" \
+    #               f"\nFrames: {frames}"
+    # fig.suptitle(f"Tracking metric index: {str(round(tracking_metric_index, 2))}{description}", fontsize=8, x=0, ha='left')
     if road_network:
         road_network.show_road_network(ax)
-    file_name = f"{description} tracking.png"
+    # file_name = f"{description} tracking.png"
     # fig.savefig(file_name)
 
     plt.show()
-
-
 

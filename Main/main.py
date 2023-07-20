@@ -1,8 +1,10 @@
 import os
 import sys
 import matplotlib.pyplot as plt
-from shapely import Point, LineString
+from shapely import Point, LineString, Polygon
 import networkx as nx
+import random
+import math
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
@@ -15,7 +17,7 @@ from Utility import files_functions
 from SimulationEngine import simulation
 import MapToRoadMapping.osm
 from MapToRoadMapping.graph_to_road_network import show_graph_lanes
-from RoadBuildingTool.drawing_tool import draw_and_save_road_network_graph, get_vertices_and_segments
+from RoadBuildingTool.drawing_tool import draw_and_save_road_network_graph, get_vertices_and_segments, get_points_on_graph
 
 
 """
@@ -41,6 +43,18 @@ def initialize_velocity(reference_track, magnitude):
     return end
 
 
+def get_random_color():
+    # Generate random values for red, green, and blue channels
+    red = random.randint(0, 255)
+    green = random.randint(0, 255)
+    blue = random.randint(0, 255)
+
+    # Convert the values to hexadecimal and format the color code
+    color_code = "#{:02x}{:02x}{:02x}".format(red, green, blue)
+
+    return color_code
+
+
 def show_road_network(coordinates, area_name):
     graph = files_functions.extract_road_network_graph(coordinates, area_name)
     dcel_obj = dcel.Dcel(graph)
@@ -57,6 +71,7 @@ def show_saved_road_network(area_name):
     dcel_obj.build_dcel(graph)
 
     dcel_obj.show_road_network()
+
 
 
 def get_road_network(area_name, new):
@@ -94,8 +109,6 @@ def create_track(file_name, new):
     except Exception as e:
         print(e)
         return
-    # return LineString([(2, -7), (35, 8), (55, 12), (75, 15), (95, 10), (115, 8), (135, 9), (150, 12), (170, 20)])
-    # return LineString([(2, 7), (30, 8), (60, 20), (90, 7), (120, 6), (150, 3), (180, 2), (220, 50), (250, 20)])
     return LineString(track)
 
 
@@ -121,28 +134,59 @@ def simulate_on_track(frames, track_name, if_new_track):
     simulation.plot_vehicle_tracking(vehicle, frames)
 
 
-def simulate_on_road_network(frames, road_network_name, if_new_network):
+def get_vehicles_list(no_of_vehicles, road_network, obstacles):
+    no_of_nodes = road_network.graph.number_of_nodes() - 1
+    vehicles_list = []
+    for _ in range(no_of_vehicles):
+        start_node_id = random.randint(0, no_of_nodes)
+        end_node_id = random.randint(0, no_of_nodes)
+
+        while start_node_id == end_node_id:
+            end_node_id = random.randint(0, no_of_nodes)
+        print(start_node_id, end_node_id)
+        reference_track = road_network.get_track(start_node_id, end_node_id, obstacles)#start_node_id, end_node_id)
+        if _ % 2 == 0:
+            length = 4
+            width = 2
+        else:
+            length = 6
+            width = 3
+        init_speed = random.uniform(4, 8)
+        vehicle = car.Vehicle(length, width,
+                              centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
+                              angle=90, velocity=initialize_velocity(reference_track, init_speed),
+                              acceleration=ScaledPoint(0, 0),
+                              reference_track=reference_track
+                              )
+
+        vehicles_list.append(vehicle)
+    return vehicles_list
+
+
+def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_obstacles):
     road_network = get_road_network(road_network_name, new=if_new_network)
-    st_face = road_network.faces[0]
+    if if_new_obstacles:
+        obstacles_positions = get_points_on_graph(road_network, road_network_name)
+        files_functions.write_vertices_to_file(obstacles_positions, f'{road_network_name}_obstacles_positions')
+    else:
+        obstacles_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
+    obstacle_radius = 2
+    obstacles = [
+        Point(position).buffer(obstacle_radius)
+        for position in obstacles_positions
+    ]
 
-    reference_track = LineString(st_face.lane_curves[0])
-
-    vehicle = car.Vehicle(length=4, width=2,
-                          centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
-                          angle=90, velocity=initialize_velocity(reference_track, 6), acceleration=ScaledPoint(0, 0),
-                          reference_track=reference_track)
-    vehicle.current_face = st_face
-    vehicle.prev_face = vehicle.current_face
-    vehicle.set_reference_curve(road_network)
-    # simulation.create_simulation_video(vehicle, road_network, frames, with_road_network=True)
-    simulation.plot_vehicle_tracking(vehicle, frames, road_network)
+    vehicles = get_vehicles_list(20, road_network, obstacles)
+    simulation.create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network=True)
 
 
 def simulation_main():
-    frames = 8000
-    simulate_on_track(frames, "hexagon", if_new_track=False)
-    # simulate_on_road_network(frames, "squares", if_new_network=False)
+    frames = 3000
+    # simulate_on_track(frames, "hexagon", if_new_track=False)
+    simulate_on_road_network(frames, "full_network", if_new_network=False, if_new_obstacles=False)
 
 
-# road_network_main("squares", new=False)
+# road_network_main("full_network", new=False)
+
 simulation_main()
+

@@ -79,6 +79,7 @@ def get_vertices_and_segments():
         # if this is the first point of a connected component, and it is the same as the previous point, we're done
         # drawing
         if first and prev_x == x and prev_y == y:
+            plt.close(fig)
             return vertices, segments
         # update the first variable and previous point coordinates
         first = prev_x == x and prev_y == y
@@ -90,6 +91,40 @@ def draw_and_save_road_network_graph(vertices_file_name, segments_file_name):
     vertices, segments = get_vertices_and_segments()
     files_functions.write_vertices_to_file(vertices, vertices_file_name)
     files_functions.write_segments_to_file(segments, segments_file_name)
+
+
+def get_points_on_graph(road_network, road_network_name):
+    obstacles_positions = []
+    # create a figure and axes object
+    fig, ax = plt.subplots(figsize=(100, 100))
+    # set the aspect ratio of the plot to be equal
+    ax.set_aspect('equal')
+
+    ax.axis([0, 50, 0, 50])
+    road_network.show_road_network(ax, fig)
+    prev_x = 0
+    prev_y = 0
+    while True:
+        # get a single point from user input
+        point = fig.ginput(n=1, show_clicks=True, mouse_add=1)
+        # if there is no point, continue waiting for input
+        if len(point) == 0:
+            continue
+        # round the point to the nearest grid point
+        x = point[0][0]
+        y = point[0][1]
+        ax.scatter(x, y, s=0.2)
+        plt.draw()
+        # add the point to the list of vertices if it hasn't already been added
+        if (x, y) not in obstacles_positions:
+            obstacles_positions.append((x, y))
+        if prev_x == x and prev_y == y:
+            plt.close(fig)
+            return obstacles_positions
+        # update previous point coordinates
+        prev_x = x
+        prev_y = y
+
 
 
 def main():

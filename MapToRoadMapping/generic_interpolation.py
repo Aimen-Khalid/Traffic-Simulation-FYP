@@ -1,7 +1,9 @@
-from shapely import Point, LineString
-from scipy.interpolate import interp1d
-from matplotlib import pyplot as plt
+from shapely.geometry import box
 import numpy as np
+from scipy.interpolate import CubicSpline
+import matplotlib.pyplot as plt
+from shapely import Point, LineString
+from shapely.geometry import Polygon
 
 
 def rearrange_line_strings(line1, line2):
@@ -39,69 +41,83 @@ def rearrange_line_strings(line1, line2):
     return line1, line2
 
 
-def get_interpolated_curve(line_string1, line_string2, limit):
-    # Extract x and y coordinates from the first line string
-    line_string1 = LineString(line_string1)
-    line_string2 = LineString(line_string2)
+def path_interpolation(l1, l2, num_points=10):
+    # Combine the points from l1 and l2
+    points = np.array(list(l1.coords) + list(l2.coords))
 
-    line_string1, line_string2 = rearrange_line_strings(
-        line_string1, line_string2)
-    x_data1, y_data1 = line_string1.xy
+    # Separate the x and y coordinates
+    x = points[:, 0]
+    y = points[:, 1]
 
-    # Extract x and y coordinates from the second line string
-    x_data2, y_data2 = line_string2.xy
+    # Compute the cumulative distance along the path
+    distance = np.concatenate(
+        [[0], np.cumsum(np.sqrt(np.diff(x) ** 2 + np.diff(y) ** 2))])
 
-    # Combine the x and y coordinates into a single line string
-    line_string_combined = list(line_string1.coords) + \
-        list(line_string2.coords)
+    # Fit cubic splines to x and y as functions of distance
+    cs_x = CubicSpline(distance, x)
+    cs_y = CubicSpline(distance, y)
 
-    # Extract x and y coordinates from the combined line string
-    x_data_combined, y_data_combined = zip(*line_string_combined)
-    # Cubic spline interpolation
-    y_f = interp1d(x_data_combined, y_data_combined, 'cubic')
-    x = []
-    for i in range(len(x_data_combined) - 1):
-        x_values = np.linspace(
-            x_data_combined[i], x_data_combined[i + 1], limit)[:-1]
-        x.extend(x_values)
-    y = y_f(x)
-    filtered_x = []
-    filtered_y = []
-    for i in range(len(x)):
-        if not (line_string1.bounds[0] <= x[i] <= line_string1.bounds[2] or line_string2.bounds[0] <= x[i] <= line_string2.bounds[2]):
-            filtered_x.append(x[i])
-            filtered_y.append(y[i])
-    filtered_x.insert(0, line_string1.coords[-1][0])
-    filtered_x.append(line_string2.coords[0][0])
-    filtered_y.insert(0, line_string1.coords[-1][1])
-    filtered_y.append(line_string2.coords[0][1])
+    # Create new distance values
+    distance_new = np.linspace(
+        distance[1] + 1e-10, distance[2] - 1e-10, num_points)
 
-    # Create a LineString object from the filtered points
-    filtered_line_string = LineString(zip(filtered_x, filtered_y))
+    # Compute interpolated x and y values
+    x_new = cs_x(distance_new)
+    y_new = cs_y(distance_new)
 
-    return list(filtered_line_string.coords)
+    return list(zip(x_new, y_new))
 
 
-def main():
+def plot_interpolation(l1, l2):
+    # Call the path_interpolation function
+    points_in_path = path_interpolation(l1, l2)
 
-    l1 = [[21, 38], [72, 89]]
-    l2 = [[96, 115], [38, 146]]
-    x = [l1[0][0], l1[1][0]]
-    y = [l1[0][1], l1[1][1]]
-    plt.plot(x, y)
+    # Separate the x and y coordinates
+    x_new, y_new = zip(*points_in_path)
 
-    x = [l2[0][0], l2[1][0]]
-    y = [l2[0][1], l2[1][1]]
-    plt.plot(x, y)
+    # Extract coordinates from l1 and l2 for plotting
+    l1_points = list(l1.coords)
+    l2_points = list(l2.coords)
 
-    limit = 10
-    curve = get_interpolated_curve(l2, l1, limit)
-    x = [curve[i][0] for i in range(len(curve))]
-    y = [curve[i][1] for i in range(len(curve))]
+    # Extract x and y coordinates for LineString 1 and 2
+    l1_x = [p[0] for p in l1_points]
+    l1_y = [p[1] for p in l1_points]
+    l2_x = [p[0] for p in l2_points]
+    l2_y = [p[1] for p in l2_points]
 
-    plt.plot(x, y, 'b')
-    plt.scatter(x, y, color='r')
+    # Plot the original points and lines
+    plt.plot(l1_x, l1_y, 'go-', label='Line 1')
+    plt.plot(l2_x, l2_y, 'bo-', label='Line 2')
+
+    # Adding labels to the points
+    for p in l1_points+l2_points:
+        plt.text(p[0], p[1], str(p))
+
+    # Plot the interpolated points
+    plt.plot(x_new, y_new, 'gx', label='Interpolated Points')
+
+    # Setting the legend
+    plt.legend()
+
     plt.show()
 
 
-# main()
+# # Defining your LineStrings
+# l1 = [[136.39999999999998, 30.19999999999996],
+#       [80.49911863734805, 72.12566102198898]]
+# l2 = [[78.37533396314232, 71.70578675783356],
+#       [23.328201177351378, 35.007698233972945]]
+# # l1 = [[136.39999999999998, 30.19999999999996],
+# #       [80.49911863734805, 72.12566102198898]]
+# # l2 = [[71.02978074970113, 82.63867504905632],
+# #       [35.00769823397293, 136.6717988226486]]
+# l1 = [[35, 24], [88, 75]]
+# l2 = [[87, 108], [38, 153]]
+# # Plotting
+#
+# l1 = LineString(l1)
+# l2 = LineString(l2)
+#
+# l1, l2 = rearrange_line_strings(l1, l2)
+#
+# plot_interpolation(l1, l2)

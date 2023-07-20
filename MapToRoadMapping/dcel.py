@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 import traceback
 import shapely
 from Utility.geometry import get_intersection_point, lane_width, merge_line_strings
-from .generic_interpolation import get_interpolated_curve
+from .generic_interpolation import path_interpolation
 from .graph_to_road_network import get_translated_vertices_segments, translate_segment
 import networkx as nx
-import matplotlib.lines as mlines
+from ObstacleAvoidance import obstacle_avoidance
+from RoadBuildingTool import drawing_tool
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -142,9 +143,9 @@ class Face:
                 if self.polygon.distance(Point(adj_face.lane_curves[i][1])) < 0.01:
                     emerging_curves = []
                     for lane_curve in self.lane_curves:
-                        if adj_face.lane_curves[i][1] == list(lane_curve[0]):
+                        if Point(adj_face.lane_curves[i][1]).distance(Point(lane_curve[0])) < 0.5:
                             emerging_curves.append(lane_curve)
-                        if adj_face.lane_curves[i][1] == lane_curve[1]:
+                        if Point(adj_face.lane_curves[i][1]).distance(Point(lane_curve[1])) < 0.5:
                             lane_curve[0], lane_curve[1] = lane_curve[1], lane_curve[0]
                             emerging_curves.append(lane_curve)
                     updated_curves.extend(emerging_curves)
@@ -482,8 +483,8 @@ class Dcel:
                     y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
 
                     x, y = LineString(face.lane_curves[i]).xy
-                    for j in range(len(x)):
-                        ax.scatter(x[j], y[j], s=2, color="red")
+                    # for j in range(len(x)):
+                    #     ax.scatter(x[j], y[j], s=2, color="red")
 
                     # ax.scatter(x[0], y[0], s=font_size)
                     ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
@@ -508,11 +509,12 @@ class Dcel:
 
         x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
         y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
+        ax.plot(x, y, color='white', linewidth=2, linestyle='dashed')
 
         x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
         y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed')
+        ax.plot(x, y, color='white', linewidth=2, linestyle='dashed')
+
 
     def plot_curves(self, ax, face):
         for i in range(len(face.lane_curves)):
@@ -520,18 +522,19 @@ class Dcel:
             y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
             if face.tag == JUNCTION:
                 x, y = LineString(face.lane_curves[i]).xy
-                ax.plot(x, y, color='blue', linewidth=0.2)
+                # ax.plot(x, y, color='blue', linewidth=0.2)
+                # ax.scatter(x, y, color='red', s=0.5)
             else:
                 start_point = (x[0], y[0])
                 end_point = (x[1], y[1])
-
+                # ax.plot(x, y, color='blue', linewidth=0.2)
                 # Add arrowhead manually
                 arrow_direction = (end_point[0] - start_point[0],
                                    end_point[1] - start_point[1])
-                # Create an arrow patch
+                # # Create an arrow patch
                 arrow_patch = patches.FancyArrow(start_point[0], start_point[1], arrow_direction[0], arrow_direction[1],
-                                                 head_width=1, head_length=1, linewidth=0.2, color='blue')
-                # Add the arrow patch to the axis
+                                                 head_width=1, head_length=1, linewidth=0.01, color='blue')
+                # # Add the arrow patch to the axis
                 ax.add_patch(arrow_patch)
 
                 # Add arrowhead manually
@@ -552,10 +555,13 @@ class Dcel:
             y = [edge.origin.y, edge.destination.y]
             ax.plot(x, y, color='white', linewidth=0.2)
 
-    def show_road_network(self, axis=None):
+    def show_road_network(self, axis=None, figure=None):
         fig, ax = plt.subplots()
         if axis is not None:
             ax = axis
+
+        if figure is not None:
+            fig = figure
 
         # self.add_text_to_plot(ax)
 
@@ -570,7 +576,8 @@ class Dcel:
         self.plot_edges(ax)
         ax.axis("equal")
         ax.axis("off")
-        plt.show()
+        if figure is None:
+            plt.show()
 
     def get_face_for_point(self, point):
         point = Point(point[0], point[1])
@@ -807,7 +814,7 @@ class Dcel:
 
         def connect_curves(curve1, curve2):
             if interpolate:
-                interpolated_curve = get_interpolated_curve(curve1, curve2, no_of_points)
+                interpolated_curve = path_interpolation(LineString(curve1), LineString(curve2), no_of_points)
                 face.lane_curves.append(interpolated_curve)
             else:
                 closest_point1 = find_closest_point(LineString(curve1), face.polygon)
@@ -832,8 +839,8 @@ class Dcel:
                 current_curve = closest_face.lane_curves[3 if index == 0 else 0]
                 potential_curves = get_potential_closest_curves(closest_face)
 
-        interpolate = False
-        no_of_points = 10
+        interpolate = True
+        no_of_points = 5
 
         for face in self.faces:
             if face.tag == JUNCTION:
@@ -843,7 +850,7 @@ class Dcel:
                     connect_curves_sets(first_curve_index=3)
                 face.set_junction_curves_direction()
 
-    def get_track(self, start_node_id, end_node_id):
+    def get_track(self, start_node_id, end_node_id, obstacles):
         def get_lane_curve(target_point, lane_curves_list):
             """Returns that outer-most lane curve from lane_curves_list the origin of which
             is closest to the target point"""
@@ -879,20 +886,32 @@ class Dcel:
 
         def create_track_from_faces(face_sequence):
             track = LineString([])
+
             for i, (face, node) in enumerate(face_sequence):
                 if face.tag == ROAD:
-                    face_curve = get_lane_curve(node, face.lane_curves)
-                    track = merge_line_strings(LineString(track), LineString(face_curve))
+                    face_curve = LineString(get_lane_curve(node, face.lane_curves))
+                    face_curve = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, face_curve, face.polygon, face.road_separator)
+                    track = merge_line_strings(LineString(track), face_curve)
                 if face.tag == JUNCTION:
+                    if i == len(face_sequence) - 1:
+                        return track
                     start_point = track.coords[-1]
                     end_point = get_lane_curve(node, face_sequence[i + 1][0].lane_curves)[0]
-                    track = merge_line_strings(LineString(track), LineString([start_point, end_point]))
+                    track_part = LineString([start_point, end_point])
+                    track_part = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, track_part, face.polygon, face.road_separator)
+
+                    track = merge_line_strings(LineString(track), track_part)
             return track
 
         start_node = get_node_from_graph(self.graph, 'id', start_node_id)
         end_node = get_node_from_graph(self.graph, 'id', end_node_id)
         shortest_path_nodes = nx.shortest_path(self.graph, start_node, end_node)
         face_sequence = get_face_sequence()
+        # points = drawing_tool.get_points_on_graph(self, 'cars_initiation')
+        # face_sequence = []
+        # for point in points:
+        #     f = self.get_face_for_point(point)
+        #     face_sequence.append((f, point))
         track = create_track_from_faces(face_sequence)
         return track
 

@@ -34,7 +34,8 @@ class Lookahead:
 
 class Vehicle:
 
-    def __init__(self, length, width, centroid, angle, velocity, acceleration, reference_track=None):
+    def __init__(self, length, width, centroid, angle, velocity, acceleration, goal_speed=8, trail_color="grey",
+                 track_color="green", reference_track=None):
 
         # parameters
         self.angle_threshold = params["angle_threshold"]
@@ -43,10 +44,13 @@ class Vehicle:
         self.width = width
         self.speed_limit = 10
         self.acc_limit = 2.65
-        self.goal_speed = 8
+        self.goal_speed = goal_speed
         self.theta = -90
         self.reference_track = reference_track
         self.next_lane_curve = None
+        self.trail_color = trail_color
+        self.track_color = track_color
+        self.stopped = False
 
         # state variables
         self.centroid = centroid
@@ -121,9 +125,9 @@ class Vehicle:
     def set_velocity(self):
         acc = self.controller()
         self.velocity += (acc * params["dt"])
-        # if self.velocity.norm() < 0.5:
-        #     self.velocity = self.velocity / self.velocity.norm()
-        #     self.velocity = self.velocity * 0.5
+        if Point(self.reference_track.coords[-1]).distance(self.front_mid_point) < 6:
+            print(Point(self.reference_track.coords[-1]))
+            self.stopped = True
         self.velocity = geometry.keep_in_limit(self.velocity, self.speed_limit)
 
     def set_centroid(self):
@@ -170,6 +174,8 @@ class Vehicle:
         self.prev_face = self.current_face
 
     def update_state_vars(self):
+        if self.stopped:
+            return
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
         self.set_lookahead_distance()
@@ -267,3 +273,4 @@ class Vehicle:
             last_curve = LineString(list(self.reference_track.coords)[-2:])
             connected_curves = self.current_face.get_connected_curves(last_curve)
         self.current_face = starting_face
+
