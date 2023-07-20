@@ -143,7 +143,6 @@ def get_vehicles_list(no_of_vehicles, road_network, obstacles):
 
         while start_node_id == end_node_id:
             end_node_id = random.randint(0, no_of_nodes)
-        print(start_node_id, end_node_id)
         reference_track = road_network.get_track(start_node_id, end_node_id, obstacles)#start_node_id, end_node_id)
         if _ % 2 == 0:
             length = 4
