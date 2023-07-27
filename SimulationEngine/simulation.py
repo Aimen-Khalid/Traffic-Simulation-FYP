@@ -54,12 +54,12 @@ def add_trail(vehicle, parameters):
 
 def add_text(vehicle, parameters):
     text = (
-        # f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n'
-        # + f'parallel acc: {str(round(vehicle.parallel_acc.norm(), 2))}' + ' ms2'
+        # f'per acc: {str(round(vehicle.perpendicular_acc.norm(), 2))}' + ' ms2\n' +
+        f'parallel acc: {str(vehicle.parallel_acc.norm() * vehicle.parallel_acc_sign)}' + ' ms2'
         # + '\nangle: '
         # + str(round(math.degrees(vehicle.error), 2)) + ' degrees' +
             '\nspeed: '
-            + str(f'{round(vehicle.velocity.norm(), 2)}') + ' ms'
+            + str(f'{vehicle.velocity.norm()}') + ' ms'
         # + '\nerror: '
         # + str(f'{round(vehicle.error, 2)}')
     )
@@ -220,9 +220,10 @@ def get_artist_objects(ax, no_of_vehicles):
     speed_track_lines = []
     turning_circles = []
     speed_circles = []
+    texts = []
 
     for i in range(no_of_vehicles):
-        vehicle_line, = ax.plot([], [], linewidth=0.5, color='black')
+        vehicle_line, = ax.fill([], [], color='black')
         trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
         acc_line, = ax.plot([], [], linewidth=0.5, color='green')
         acc2_line, = ax.plot([], [], linewidth=0.5, color='green')
@@ -230,7 +231,7 @@ def get_artist_objects(ax, no_of_vehicles):
         turning_lookahead_point = ax.scatter([], [], color='red', s=3)
         speed_lookahead_point = ax.scatter([], [], color='green', s=3)
         closest_point = ax.scatter([], [], color='black', s=3)
-        # text = ax.text(0, 0, "", fontsize=6)
+        text = ax.text(0, 0, "", fontsize=6)
         turning_track_line, = ax.plot([], [], linewidth=0.5, color='red')
         speed_track_line, = ax.plot([], [], linewidth=0.5, color='green')
         turning_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='red', facecolor='none', linewidth=0.3)
@@ -250,9 +251,10 @@ def get_artist_objects(ax, no_of_vehicles):
         speed_track_lines.append(speed_track_line)
         turning_circles.append(turning_circle)
         speed_circles.append(speed_circle)
+        texts.append(text)
 
     return vehicle_lines, acc_lines, acc2_lines, velocity_lines, closest_points, turning_track_lines, speed_track_lines, \
-        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles
+        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles, texts
 
 
 def separate_objects(my_list):
@@ -280,7 +282,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     # ax.plot(x, y, linewidth=1, color='green')
 
     vehicle_lines, acc_lines, acc2_lines, velocity_lines, closest_points, turning_track_lines, speed_track_lines, \
-        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles = get_artist_objects(ax, len(vehicles))
+        trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles, texts = get_artist_objects(ax, len(vehicles))
 
     def init():
         # return vehicle_lines[0], acc_lines[0], acc2_lines[0], velocity_lines[0], closest_points[0], turning_track_lines[0], speed_track_lines[0], \
@@ -290,20 +292,21 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     def animate(i):
         for j in range(len(vehicles)):
             parameters = parameters_list[j]
-            vehicle_lines[j].set_data(parameters['vehicle'][i])
+            x, y = parameters['vehicle'][i]
+            vehicle_lines[j].set_xy(list(zip(x, y)))
             velocity_lines[j].set_data(parameters['velocity'][i])
             trail_lines[j].set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
             acc_lines[j].set_data(parameters['perpendicular_acc'][i])
             acc2_lines[j].set_data(parameters['parallel_acc'][i])
-            # turning_lookahead_points[j].set_offsets((parameters['turning_lookahead_point'][i].x,
-            #                                          parameters['turning_lookahead_point'][i].y))
-            # speed_lookahead_points[j].set_offsets(
-            #     (parameters['speed_lookahead_point'][i].x, parameters['speed_lookahead_point'][i].y))
-            # closest_points[j].set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
-            # turning_circles[j].set_radius(parameters["turning_circle"][i][1])
-            # turning_circles[j].set_center((parameters["turning_circle"][i][0].x, parameters["turning_circle"][i][0].y))
-            # speed_circles[j].set_radius(parameters["speed_circle"][i][1])
-            # speed_circles[j].set_center((parameters["speed_circle"][i][0].x, parameters["speed_circle"][i][0].y))
+            turning_lookahead_points[j].set_offsets((parameters['turning_lookahead_point'][i].x,
+                                                     parameters['turning_lookahead_point'][i].y))
+            speed_lookahead_points[j].set_offsets(
+                (parameters['speed_lookahead_point'][i].x, parameters['speed_lookahead_point'][i].y))
+            closest_points[j].set_offsets((parameters["closest_point"][i].x, parameters["closest_point"][i].y))
+            turning_circles[j].set_radius(parameters["turning_circle"][i][1])
+            turning_circles[j].set_center((parameters["turning_circle"][i][0].x, parameters["turning_circle"][i][0].y))
+            speed_circles[j].set_radius(parameters["speed_circle"][i][1])
+            speed_circles[j].set_center((parameters["speed_circle"][i][0].x, parameters["speed_circle"][i][0].y))
 
             start, end = parameters['turning_track_vector'][i]
             x = [start[0], end[0]]
@@ -314,6 +317,11 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             x = [start[0], end[0]]
             y = [start[1], end[1]]
             speed_track_lines[j].set_data(x, y)
+
+            x = min(parameters['centroid'][i].get_x() for j in range(len(parameters['centroid'])))
+            y = max(parameters['centroid'][i].get_y() for j in range(len(parameters['centroid'])))
+            # texts[j].set_position((x, y))
+            texts[j].set_text(parameters['text'][i])
 
         window_size = 40
         # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
@@ -332,10 +340,10 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             return_string += f"acc_lines[{i}], "
             return_string += f"acc2_lines[{i}], "
             return_string += f"trail_lines[{i}], "
-            # return_string += f"turning_track_lines[{i}], "
-            # return_string += f"speed_track_lines[{i}], "
-            # return_string += f"turning_circles[{i}], "
-            # return_string += f"speed_circles[{i}], "
+            return_string += f"turning_track_lines[{i}], "
+            return_string += f"speed_track_lines[{i}], "
+            return_string += f"turning_circles[{i}], "
+            return_string += f"speed_circles[{i}], "
 
         return eval(return_string)
         # return separate_objects(vehicle_lines), separate_objects(velocity_lines), separate_objects(acc_lines), \
@@ -345,7 +353,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     print("Animation in progress...")
     start = time.time()
     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
-    anim.save(file_name, writer='ffmpeg', fps=60)
+    anim.save(file_name, writer='ffmpeg', fps=240)
     end = time.time()
     print("Animation COMPLETED....")
     print(f"{int(end - start)} Seconds")
@@ -441,4 +449,3 @@ def plot_vehicle_tracking(vehicles, frames, road_network=None):
     # fig.savefig(file_name)
 
     plt.show()
-

@@ -174,16 +174,16 @@ def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_o
         Point(position).buffer(obstacle_radius)
         for position in obstacles_positions
     ]
-
+    obstacles = []
     vehicles = get_vehicles_list(20, road_network, obstacles)
     simulation.create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network=True)
 
 
 def simulation_main():
-    frames = 3000
+    frames = 5000
     # simulate_on_track(frames, "hexagon", if_new_track=False)
     simulate_on_road_network(frames, "full_network", if_new_network=False, if_new_obstacles=False)
-
+    plt.close('all')
 
 # road_network_main("full_network", new=False)
 

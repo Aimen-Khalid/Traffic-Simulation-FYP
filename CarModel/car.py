@@ -50,7 +50,7 @@ class Vehicle:
         self.next_lane_curve = None
         self.trail_color = trail_color
         self.track_color = track_color
-        self.stopped = False
+        self.in_breaking_distance = False
 
         # state variables
         self.centroid = centroid
@@ -105,29 +105,38 @@ class Vehicle:
             self.perpendicular_acc = geometry.get_vector(0, 0)
 
     def set_parallel_acc(self):
-        if abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
+        breaking_distance = self.velocity.norm()
+        destination_point = Point(self.reference_track.coords[-1])
+        if destination_point.distance(self.front_mid_point) < 2 * breaking_distance:
+            self.in_breaking_distance = True
+        if self.in_breaking_distance:
+            dec_magnitude = -self.velocity.norm()#-1 * (0.5 * self.parallel_acc.norm())
+            self.parallel_acc_sign = -1
+            self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
+            # print('stopping')
+        elif abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
             dec_magnitude = (self.speed_lookahead.angle - radians(params["angle_threshold"])) * (-params["P_PARALLEL_DEC_WEIGHT"])
             self.parallel_acc_sign = -1 if dec_magnitude * (-params["P_PARALLEL_DEC_WEIGHT"]) < 0 else 1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
+            # print('turning')
         else:
             acc_magnitude = params["P_PARALLEL_ACC_WEIGHT"] * (self.goal_speed - self.velocity.norm())
             self.parallel_acc = (self.velocity / self.velocity.norm()) * acc_magnitude
             self.parallel_acc_sign = -1 if acc_magnitude < 0 else 1
+            # print('accelerating')
 
         self.parallel_acc = geometry.keep_in_limit(self.parallel_acc, self.acc_limit)
 
     def controller(self):
         self.set_perpendicular_acc()
         self.set_parallel_acc()
-        resultant_acc = self.perpendicular_acc + self.parallel_acc
+        resultant_acc = self.parallel_acc + self.perpendicular_acc
         return geometry.keep_in_limit(resultant_acc, self.acc_limit)
 
     def set_velocity(self):
         acc = self.controller()
         self.velocity += (acc * params["dt"])
-        if Point(self.reference_track.coords[-1]).distance(self.front_mid_point) < 6:
-            print(Point(self.reference_track.coords[-1]))
-            self.stopped = True
+
         self.velocity = geometry.keep_in_limit(self.velocity, self.speed_limit)
 
     def set_centroid(self):
@@ -174,7 +183,7 @@ class Vehicle:
         self.prev_face = self.current_face
 
     def update_state_vars(self):
-        if self.stopped:
+        if round(self.velocity.norm(), 2) <= 0.2:
             return
         self.set_vehicle_front_mid_point()
         self.set_closest_point()

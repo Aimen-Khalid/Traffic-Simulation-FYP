@@ -1,16 +1,13 @@
 import math as m
 from matplotlib import patches
-from shapely.geometry import Polygon, Point, LineString, MultiPoint
+from shapely.geometry import Polygon, Point, LineString
 import random
 import matplotlib.pyplot as plt
-import traceback
-import shapely
 from Utility.geometry import get_intersection_point, lane_width, merge_line_strings
 from .generic_interpolation import path_interpolation
 from .graph_to_road_network import get_translated_vertices_segments, translate_segment
 import networkx as nx
 from ObstacleAvoidance import obstacle_avoidance
-from RoadBuildingTool import drawing_tool
 
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
@@ -470,7 +467,7 @@ class Dcel:
             # plt.fill(x, y, color=face.fill_color)
         # for vertex in vertices:
         #     plt.scatter(vertex[0], vertex[1])
-        plt.show()
+        # plt.show()
 
     def add_text_to_plot(self, ax):
         font_size = 6
