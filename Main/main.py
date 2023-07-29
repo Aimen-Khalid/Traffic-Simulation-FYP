@@ -5,16 +5,15 @@ from shapely import Point, LineString, Polygon
 import networkx as nx
 import random
 import math
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.append(parent_dir)
 
-from MapToRoadMapping import dcel
+from MapToRoadMapping import dcel, osm
 from CarModel import car
 from Utility.point import ScaledPoint
 from Utility import files_functions
-from SimulationEngine import simulation
+from SimulationEngine import simulation_with_vectors
 import MapToRoadMapping.osm
 from MapToRoadMapping.graph_to_road_network import show_graph_lanes
 from RoadBuildingTool.drawing_tool import draw_and_save_road_network_graph, get_vertices_and_segments, get_points_on_graph
@@ -114,7 +113,7 @@ def create_track(file_name, new):
 
 def road_network_main(fn, new):
     # coordinates = osm.get_coordinates_from_map()
-    # area_name = input("Name the area that lies within the selected coordinates: ")
+    # area_name = 'test'#input("Name the area that lies within the selected coordinates: ")
     # show_road_network(coordinates, area_name)
 
     if new:
@@ -138,18 +137,19 @@ def get_vehicles_list(no_of_vehicles, road_network, obstacles):
     no_of_nodes = road_network.graph.number_of_nodes() - 1
     vehicles_list = []
     for _ in range(no_of_vehicles):
-        start_node_id = random.randint(0, no_of_nodes)
-        end_node_id = random.randint(0, no_of_nodes)
+        start_node_id = 0#random.randint(0, no_of_nodes)
+        end_node_id = 20#random.randint(0, no_of_nodes)
 
         while start_node_id == end_node_id:
             end_node_id = random.randint(0, no_of_nodes)
         reference_track = road_network.get_track(start_node_id, end_node_id, obstacles)#start_node_id, end_node_id)
+        #honda civic
         if _ % 2 == 0:
-            length = 4
-            width = 2
+            length = 4.6
+            width = 1.8
         else:
-            length = 6
-            width = 3
+            length = 3.5
+            width = 1.5
         init_speed = random.uniform(4, 8)
         vehicle = car.Vehicle(length, width,
                               centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
@@ -164,28 +164,29 @@ def get_vehicles_list(no_of_vehicles, road_network, obstacles):
 
 def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_obstacles):
     road_network = get_road_network(road_network_name, new=if_new_network)
-    if if_new_obstacles:
-        obstacles_positions = get_points_on_graph(road_network, road_network_name)
-        files_functions.write_vertices_to_file(obstacles_positions, f'{road_network_name}_obstacles_positions')
-    else:
-        obstacles_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
-    obstacle_radius = 2
-    obstacles = [
-        Point(position).buffer(obstacle_radius)
-        for position in obstacles_positions
-    ]
+    # if if_new_obstacles:
+    #     obstacles_positions = get_points_on_graph(road_network, road_network_name)
+    #     files_functions.write_vertices_to_file(obstacles_positions, f'{road_network_name}_obstacles_positions')
+    # else:
+    #     obstacles_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
+    # obstacle_radius = 2
+    # obstacles = [
+    #     Point(position).buffer(obstacle_radius)
+    #     for position in obstacles_positions
+    # ]
     obstacles = []
-    vehicles = get_vehicles_list(15, road_network, obstacles)
-    simulation.create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network=True)
+    vehicles = get_vehicles_list(1, road_network, obstacles)
+    simulation_with_vectors.create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network=True)
 
 
 def simulation_main():
-    frames = 3000
+    frames = 4000
     # simulate_on_track(frames, "hexagon", if_new_track=False)
     simulate_on_road_network(frames, "full_network", if_new_network=False, if_new_obstacles=False)
+
     plt.close('all')
 
-# road_network_main("full_network", new=False)
+# road_network_main("octagon", new=True)
 
 
 simulation_main()

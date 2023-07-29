@@ -137,10 +137,13 @@ def modify_reference_track(reference_track, buffer, road):
     #clipped_boundary = clipped_buffer_boundary(buffer, start_point, end_point)
 
     part2_1, part2_2 = get_polygon_halves(intersection_point1,  intersection_point2, buffer)
-
-    part2 = part2_1 if road.contains(LineString(part2_1)) else part2_2
-
+    try:
+        part2 = part2_1 if road.contains(LineString(part2_1)) else part2_2
+    except Exception:
+        print('here')
+        part2 = part2_1
     part3 = [intersection_point2, list(reference_track.coords)[-1]]
+
 
     # if swap:
     #     return LineString(part2)
@@ -212,7 +215,7 @@ def modify_reference_track_for_obstacles(obstacles, reference_track, road_polygo
     #
     for obstacle in obstacles:
         obstacle_centre = obstacle.centroid
-        buffer = obstacle_centre.buffer(8)
+        buffer = obstacle_centre.buffer(7)
     #
     #     if Polygon(road_half_1).contains(obstacle_centre):
     #         road = road_half_1

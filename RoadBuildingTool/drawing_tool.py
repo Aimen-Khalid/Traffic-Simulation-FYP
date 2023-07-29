@@ -37,8 +37,12 @@ def get_vertices_and_segments():
     box_size = 5
     # set the axis limits and ticks
     ax.axis([0, 50, 0, 50])
+    # ax.get_xaxis().set_visible(False)
+    # ax.get_yaxis().set_visible(False)
+
     ax.xaxis.set_ticks(range(0, 200, box_size))
     ax.yaxis.set_ticks(range(0, 200, box_size))
+    ax.tick_params(axis='both', colors='white')
 
     # add a grid to the plot
     ax.grid(color='green', linestyle='-', linewidth=0.5)
@@ -101,6 +105,7 @@ def get_points_on_graph(road_network, road_network_name):
     ax.set_aspect('equal')
 
     ax.axis([0, 50, 0, 50])
+
     road_network.show_road_network(ax, fig)
     prev_x = 0
     prev_y = 0
@@ -138,3 +143,21 @@ def main():
 
 
 # main()
+
+
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    vertices, segments = get_vertices_and_segments()
+
+    return f"Vertices: {vertices}<br>Segments: {segments}"
+    # Process the vertices and segments as needed
+    # For example, you can display the results or save them to a file.
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

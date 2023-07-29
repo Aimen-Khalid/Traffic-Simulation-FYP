@@ -8,7 +8,7 @@ from .generic_interpolation import path_interpolation
 from .graph_to_road_network import get_translated_vertices_segments, translate_segment
 import networkx as nx
 from ObstacleAvoidance import obstacle_avoidance
-
+import matplotlib
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
 ROAD = 1
@@ -128,8 +128,11 @@ class Face:
             edge = edge.next
         if edge.tag == BOUNDARY and is_parallel(edge, self.lane_curves[0]):
             boundary_edges.append(edge)
-        self.set_curves_direction_helper(boundary_edges[0].twin)
-        self.set_curves_direction_helper(boundary_edges[1].twin)
+        try:
+            self.set_curves_direction_helper(boundary_edges[0].twin)
+            self.set_curves_direction_helper(boundary_edges[1].twin)
+        except Exception:
+            print('here')
 
     def set_junction_curves_direction(self):
         if self.tag != JUNCTION:
@@ -506,11 +509,11 @@ class Dcel:
 
         x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
         y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-        ax.plot(x, y, color='white', linewidth=2, linestyle='dashed')
+        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
 
         x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
         y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-        ax.plot(x, y, color='white', linewidth=2, linestyle='dashed')
+        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
 
 
     def plot_curves(self, ax, face):
@@ -530,12 +533,12 @@ class Dcel:
                                    end_point[1] - start_point[1])
                 # # Create an arrow patch
                 arrow_patch = patches.FancyArrow(start_point[0], start_point[1], arrow_direction[0], arrow_direction[1],
-                                                 head_width=1, head_length=1, linewidth=0.01, color='blue')
+                                                 head_width=1, head_length=1, linewidth=0.1, color='blue', zorder=10)
                 # # Add the arrow patch to the axis
                 ax.add_patch(arrow_patch)
 
                 # Add arrowhead manually
-                # arrow_props = dict(arrowstyle='->', color='blue', linewidth=0.5)
+                # arrow_props = dict(arrowstyle='->', color='blue', linewidth=0.3)
                 # annotation = ax.annotate("", xy=(end_point[0], end_point[1]),
                 #                          xytext=(start_point[0], start_point[1]),
                 #                          arrowprops=arrow_props)
@@ -546,11 +549,11 @@ class Dcel:
             x = [edge.origin.x, edge.destination.x]
             y = [edge.origin.y, edge.destination.y]
             ax.plot(x, y, color='black')
-        partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
-        for edge in partition_edges:
-            x = [edge.origin.x, edge.destination.x]
-            y = [edge.origin.y, edge.destination.y]
-            ax.plot(x, y, color='white', linewidth=0.2)
+        # partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
+        # for edge in partition_edges:
+        #     x = [edge.origin.x, edge.destination.x]
+        #     y = [edge.origin.y, edge.destination.y]
+        #     ax.plot(x, y, color='white', linewidth=0.2)
 
     def show_road_network(self, axis=None, figure=None):
         fig, ax = plt.subplots()
@@ -559,13 +562,21 @@ class Dcel:
 
         if figure is not None:
             fig = figure
-
         # self.add_text_to_plot(ax)
+        # matplotlib.use('Agg')
 
+        screen_resolution = (1920, 1080)
+        fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=150)
+
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         for face in self.faces:
             if face.tag in [ROAD, JUNCTION]:
                 x, y = face.polygon.exterior.xy
-                ax.fill(x, y, color='grey', alpha=0.5, edgecolor='none')
+                grey = '#807E78'
+                ax.fill(x, y, color=grey, edgecolor=grey)
+            # if face.tag in [NON_ROAD]:
+            #     x, y = face.polygon.exterior.xy
+            #     ax.fill(x, y, color='#009A17', edgecolor='white', linewidth=10)
             if face.tag == ROAD:
                 self.plot_separators(ax, face)
             if face.tag in [ROAD, JUNCTION]:

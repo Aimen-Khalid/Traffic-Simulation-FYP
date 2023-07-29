@@ -12,7 +12,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from .point import ScaledPoint
-lane_width = 12
+lane_width = 10
 
 
 def get_y_at_x(origin, destination, x):

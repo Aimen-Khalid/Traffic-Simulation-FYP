@@ -19,7 +19,7 @@ params = {
     "P_PARALLEL_DEC_WEIGHT": 20,
     "P_PARALLEL_ACC_WEIGHT": 0.5,
     "angle_threshold": 2.5,
-    "lookahead_time": 1.5
+    "lookahead_time": 1.25
 }
 
 
@@ -183,7 +183,7 @@ class Vehicle:
         self.prev_face = self.current_face
 
     def update_state_vars(self):
-        if round(self.velocity.norm(), 2) <= 0.2:
+        if round(self.velocity.norm(), 2) <= 0.2 :
             return
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
