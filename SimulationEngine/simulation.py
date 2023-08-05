@@ -20,7 +20,7 @@ from PIL import Image
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'lightgrey'
 NON_ROAD_COLOR = 'white'
-TRAIL_COLOR = 'grey'
+TRAIL_COLOR = '#807E78'#'grey'
 
 """For testing this module, please see simulation_main in main.py of Main module"""
 
@@ -139,7 +139,7 @@ def add_circles(vehicle, parameters):
 
 
 def update_parameters_list(vehicle, parameters):
-    add_trail(vehicle, parameters)
+    # add_trail(vehicle, parameters)
     add_positions(vehicle, parameters)
     add_centroid(vehicle, parameters)
 
@@ -204,10 +204,10 @@ def plot_parameters(vehicle, fig_name):
 
 def get_artist_objects(ax, no_of_vehicles):
     vehicle_lines = []
-    trail_lines = []
+    # trail_lines = []
 
     for _ in range(no_of_vehicles):
-        vehicle_line, = ax.fill([], [], color='white', edgecolor='black')
+        vehicle_line, = ax.fill([], [], color='red', edgecolor='black', zorder=12)
 
         # car_image = plt.imread('car_image.png')
 
@@ -215,19 +215,19 @@ def get_artist_objects(ax, no_of_vehicles):
         # vehicle_line.set_data(car_image)
         # ax.add_artist(vehicle_line)
 
-        trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
+        # trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
 
         vehicle_lines.append(vehicle_line)
-        trail_lines.append(trail_line)
+        # trail_lines.append(trail_line)
 
-    return vehicle_lines, trail_lines
+    return vehicle_lines#, trail_lines
 
 
 def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network):  # reference track
     matplotlib.use('Agg')
 
     screen_resolution = (1920, 1080)
-    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=150)
+    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=200)
 
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
@@ -241,21 +241,17 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
 
     for obstacle in obstacles:
         x, y = obstacle.exterior.xy
-        ax.fill(x, y, color='#ff4d4d')
+        ax.fill(x, y, color='blue', zorder=11)
         # buffer = obstacle.centroid.buffer(6)
         # x, y = buffer.exterior.xy
         # ax.plot(x, y, color='yellow', linewidth=0.6)
 
-    x, y = vehicles[0].reference_track.xy
-    ax.plot(x, y, linewidth=2, color='green')
+    for vehicle in vehicles:
+        x, y = vehicle.reference_track.xy
+        ax.plot(x, y, linewidth=1, color='green')
 
-    vehicle_lines, trail_lines = get_artist_objects(ax, len(vehicles))
-    img = Image.open('car_image.png')
-
-
-    # img = Image.open('car_image.png')
-    #
-    # ax.imshow(img, extent=[0, 4, 0, 2])
+    # vehicle_lines, trail_lines = get_artist_objects(ax, len(vehicles))
+    vehicle_lines = get_artist_objects(ax, len(vehicles))
 
     def animate(i):
         for j in range(len(vehicles)):
@@ -272,23 +268,29 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             # extent = [min(x), max(x), min(y), max(y)]
             # vehicle_lines[j].set_offset(Bbox.from_extents(*extent))
 
-            trail_lines[j].set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
+            # trail_lines[j].set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
 
-            window_size = 120
-            # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
-            # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
+            x_min, x_max = ax.get_xlim()
+            y_min, y_max = ax.get_ylim()
+            center_x = (x_min + x_max) / 2
+            center_y = (y_min + y_max) / 2
+            window_size = 50
+            # ax.set_xlim(center_x - window_size, center_x + window_size)
+            # ax.set_ylim(center_y - window_size, center_y + window_size)
+            ax.set_xlim(parameters['centroid'][i].x - window_size, parameters['centroid'][i].x + window_size)
+            ax.set_ylim(parameters['centroid'][i].y - window_size, parameters['centroid'][i].y + window_size)
 
         return_string = ""
         for i in range(len(vehicles)):
             return_string += f"vehicle_lines[{i}], "
-            return_string += f"trail_lines[{i}], "
+            # return_string += f"trail_lines[{i}], "
 
         return eval(return_string)
 
     print("Animation in progress...")
     start = time.time()
     anim = FuncAnimation(fig, animate, frames=frames, blit=True)
-    anim.save(file_name, writer='ffmpeg', fps=180)
+    anim.save(file_name, writer='ffmpeg', fps=240)#180)
     end = time.time()
     print("Animation COMPLETED....")
     print(f"{int(end - start)} Seconds")

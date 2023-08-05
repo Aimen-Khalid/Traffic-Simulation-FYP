@@ -1,5 +1,5 @@
 import folium
-from folium.plugins import Draw
+from folium.plugins import Draw, Search, Geocoder
 import requests
 import json
 import pandas as pd
@@ -11,20 +11,14 @@ import time
 
 
 def get_coordinates_from_map():
-    m = folium.Map(location=[31.4756608, 74.3423600], zoom_start=16)
-
+    m = folium.Map(location=[31.5633366, 74.3296802], zoom_start=16)
+    Geocoder().add_to(m)
     draw = Draw(export=True, filename='coordinates.geojson')
-
     draw.add_to(m)
-
     m.save("map.html")
-
-    webbrowser.open("map.html")
-
+    # webbrowser.open("map.html")
     root = tk.Tk()
-
     root.withdraw()
-
     file_path = filedialog.askopenfilename()
     root.destroy()
 

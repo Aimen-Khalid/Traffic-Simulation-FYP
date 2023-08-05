@@ -15,7 +15,7 @@ from MapToRoadMapping import dcel
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'lightgrey'
 NON_ROAD_COLOR = 'white'
-TRAIL_COLOR = 'grey'
+TRAIL_COLOR = 'red'
 
 """For testing this module, please see simulation_main in main.py of Main module"""
 
@@ -224,17 +224,17 @@ def get_artist_objects(ax, no_of_vehicles):
     # texts = []
 
     for i in range(no_of_vehicles):
-        vehicle_line, = ax.fill([], [], color='white', edgecolor='black')
+        vehicle_line, = ax.fill([], [], color='red', edgecolor='black', zorder=12)
         trail_line, = ax.plot([], [], color=TRAIL_COLOR, linewidth=0.5)
-        acc_line, = ax.plot([], [], linewidth=0.5, color='green')
-        acc2_line, = ax.plot([], [], linewidth=0.5, color='green')
-        velocity_line, = ax.plot([], [], linewidth=0.5, color='green')
+        acc_line, = ax.plot([], [], linewidth=1, color='green')
+        acc2_line, = ax.plot([], [], linewidth=1, color='green')
+        velocity_line, = ax.plot([], [], linewidth=1, color='green')
         turning_lookahead_point = ax.scatter([], [], color='red', s=3)
         speed_lookahead_point = ax.scatter([], [], color='green', s=3)
         closest_point = ax.scatter([], [], color='black', s=3)
         text = ax.text(0, 0, "", fontsize=6)
-        turning_track_line, = ax.plot([], [], linewidth=0.5, color='red')
-        speed_track_line, = ax.plot([], [], linewidth=0.5, color='green')
+        turning_track_line, = ax.plot([], [], linewidth=1, color='red')
+        speed_track_line, = ax.plot([], [], linewidth=1, color='green')
         turning_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='red', facecolor='none', linewidth=0.3)
         ax.add_patch(turning_circle)
         speed_circle = Circle((0.5, 0.5), radius=0.3, edgecolor='green', facecolor='none', linewidth=0.3)
@@ -265,12 +265,8 @@ def separate_objects(my_list):
 def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network):  # reference track
     matplotlib.use('Agg')
 
-    screen_resolution = (1920, 1080)  # Example screen resolution (replace with your actual resolution)
-    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=150)  # Adjust dpi if needed
-
-    # Your road network plotting code here...
-
-    # Remove margins and adjust the layout
+    screen_resolution = (1920, 1080)
+    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=200)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     ax = plt.gca()
     ax.axis("off")
@@ -281,14 +277,14 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
 
     for obstacle in obstacles:
         x, y = obstacle.exterior.xy
-        ax.fill(x, y, color='#ff4d4d')
+        ax.fill(x, y, color='blue')
         # buffer = obstacle.centroid.buffer(8)
         # x, y = buffer.exterior.xy
         # ax.plot(x, y, color='yellow', linewidth=0.6)
 
 
-    # x, y = vehicles[0].reference_track.xy
-    # ax.plot(x, y, linewidth=1, color='green')
+    x, y = vehicles[0].reference_track.xy
+    ax.plot(x, y, linewidth=1, color='green')
 
     vehicle_lines, acc_lines, acc2_lines, velocity_lines, closest_points, turning_track_lines, speed_track_lines, \
         trail_lines, turning_lookahead_points, speed_lookahead_points, turning_circles, speed_circles = get_artist_objects(ax, len(vehicles))
@@ -304,7 +300,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             x, y = parameters['vehicle'][i]
             vehicle_lines[j].set_xy(list(zip(x, y)))
             velocity_lines[j].set_data(parameters['velocity'][i])
-            trail_lines[j].set_data(parameters['trail_x'][:i], parameters['trail_y'][:i])
+            trail_lines[j].set_data(parameters['trail_x'][5:i], parameters['trail_y'][5:i])
             acc_lines[j].set_data(parameters['perpendicular_acc'][i])
             acc2_lines[j].set_data(parameters['parallel_acc'][i])
             turning_lookahead_points[j].set_offsets((parameters['turning_lookahead_point'][i].x,
@@ -332,15 +328,15 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             # # texts[j].set_position((x, y))
             # texts[j].set_text(parameters['text'][i])
 
-            window_size = 40
+            window_size = 30
         # text.set_position((parameters['centroid'][i].get_x() - 1.75 * window_size, parameters['centroid'][i].get_y()))
         # x = min(parameters['centroid'][j].get_x() for j in range(len(parameters['centroid'])))
         # y = max(parameters['centroid'][j].get_y() for j in range(len(parameters['centroid'])))
         # text.set_position((x, y))
         # text.set_text(parameters['text'][i])
 
-            ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
-            ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
+            # ax.set_xlim(parameters['centroid'][i].get_x() - window_size, parameters['centroid'][i].get_x() + window_size)
+            # ax.set_ylim(parameters['centroid'][i].get_y() - window_size, parameters['centroid'][i].get_y() + window_size)
 
         return_string = ""
         for i in range(len(vehicles)):
@@ -359,7 +355,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     print("Animation in progress...")
     start = time.time()
     anim = FuncAnimation(fig, animate, init_func=init, frames=frames, blit=True)
-    anim.save(file_name, writer='ffmpeg', fps=240)
+    anim.save(file_name, writer='ffmpeg', fps=180)
     end = time.time()
     print("Animation COMPLETED....")
     print(f"{int(end - start)} Seconds")

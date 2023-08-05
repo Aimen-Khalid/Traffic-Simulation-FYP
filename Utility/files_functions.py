@@ -42,22 +42,26 @@ def load_segments_from_file(file_name):
 
 def create_verts_and_segs_files_from_coords(coordinates, vertices_fn, segments_fn):
     tags = {
-        "highway": ["primary", "secondary", "tertiary", "residential"]
+        "highway": ["primary", "secondary", "tertiary", "residential", "living_street", "service", "roads"]
     }
 
     geom = Polygon(coordinates)
 
     gdf = osmnx.geometries_from_polygon(geom, tags=tags)
+    if len(gdf) == 0:
+        raise ValueError("Selected region has no roads")
+
     gdf = osmnx.projection.project_gdf(gdf, to_crs='EPSG:3857', to_latlong=False)
-    gdf = gdf[['name', 'geometry']]
+
+    gdf = gdf[['geometry']]
     segments = []
     vertices = []
     for index, row in gdf.iterrows():
         coords = row['geometry'].coords
         for i, coord in enumerate(coords[:-1]):
             scaling_factor = 10
-            coords1 = (scaling_factor*coords[i][1], scaling_factor*coords[i][0])
-            coords2 = (scaling_factor*coords[i + 1][1], scaling_factor*coords[i + 1][0])
+            coords1 = (scaling_factor*coords[i][0], scaling_factor*coords[i][1])
+            coords2 = (scaling_factor*coords[i + 1][0], scaling_factor*coords[i + 1][1])
             segment = [coords1, coords2]
             vertices.extend((coords1, coords2))
             segments.append(segment)
@@ -70,7 +74,7 @@ def create_verts_and_segs_files_from_coords(coordinates, vertices_fn, segments_f
 def create_graph_from_files(vertices_fn, segments_fn):
     graph = nx.DiGraph()
     # Add vertices to the graph
-    vertices_ = load_vertices_from_file(vertices_fn)
+    vertices_ = list(set(load_vertices_from_file(vertices_fn)))
     segments_ = load_segments_from_file(segments_fn)
 
     # Add nodes to the graph with their specific positions

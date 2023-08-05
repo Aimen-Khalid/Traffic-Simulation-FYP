@@ -12,7 +12,7 @@ import networkx as nx
 # from rtree import index
 from Utility import geometry
 import matplotlib.pyplot as plt
-import TextFiles
+
 
 
 def translate_segment(segment, length, anticlockwise=False):
@@ -209,7 +209,7 @@ def plot_segments(segments, color, ax):
         y_values = [start[1], end[1]]
         # ax.text(start[0], start[1], f"{round(start[0])},   {str(round(start[1]))}", fontsize=6, color=color)
         # ax.text(end[0], end[1], f"{round(end[0])},   {str(round(end[1]))}", fontsize=6, color=color)
-        ax.plot(x_values, y_values, color=color)
+        ax.plot(x_values, y_values, color=color, linewidth=0.5)
 
 
 def show_graph_lanes(graph):
@@ -222,6 +222,7 @@ def show_graph_lanes(graph):
     plot_segments(partition_edges, "grey", ax)
 
     ax.set_aspect('equal')
+    ax.axis("off")
     plt.show()
 
 

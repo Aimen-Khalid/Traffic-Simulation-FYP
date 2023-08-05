@@ -25,7 +25,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_19ed3815acee26be64f59e532358b3d8 {
+                #map_30172f30f85ebde19199055e09b67c82 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -35,6 +35,8 @@
                 .leaflet-container { font-size: 1rem; }
             </style>
         
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.css"/>
     
@@ -60,17 +62,17 @@
 <body>
     
     
-            <div class="folium-map" id="map_19ed3815acee26be64f59e532358b3d8" ></div>
+            <div class="folium-map" id="map_30172f30f85ebde19199055e09b67c82" ></div>
         
     <a href='#' id='export'>Export</a>
 </body>
 <script>
     
     
-            var map_19ed3815acee26be64f59e532358b3d8 = L.map(
-                "map_19ed3815acee26be64f59e532358b3d8",
+            var map_30172f30f85ebde19199055e09b67c82 = L.map(
+                "map_30172f30f85ebde19199055e09b67c82",
                 {
-                    center: [31.4756608, 74.34236],
+                    center: [31.5633366, 74.3296802],
                     crs: L.CRS.EPSG3857,
                     zoom: 16,
                     zoomControl: true,
@@ -82,10 +84,18 @@
 
         
     
-            var tile_layer_1a638acab9665381fa4c4c5086454d0e = L.tileLayer(
+            var tile_layer_098b4117d11d6b721df0dafb6e89966c = L.tileLayer(
                 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {"attribution": "Data by \u0026copy; \u003ca target=\"_blank\" href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca target=\"_blank\" href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
-            ).addTo(map_19ed3815acee26be64f59e532358b3d8);
+            ).addTo(map_30172f30f85ebde19199055e09b67c82);
+        
+    
+            L.Control.geocoder(
+                {"collapsed": false, "defaultMarkGeocode": true, "position": "topright"}
+            ).on('markgeocode', function(e) {
+                map_30172f30f85ebde19199055e09b67c82.setView(e.geocode.center, 11);
+            }).addTo(map_30172f30f85ebde19199055e09b67c82);
+
         
     
             var options = {
@@ -95,13 +105,13 @@
             }
             // FeatureGroup is to store editable layers.
             var drawnItems = new L.featureGroup().addTo(
-                map_19ed3815acee26be64f59e532358b3d8
+                map_30172f30f85ebde19199055e09b67c82
             );
             options.edit.featureGroup = drawnItems;
-            var draw_control_a1d298d08bee265ffa34e2c53539daf8 = new L.Control.Draw(
+            var draw_control_449f2ced024ef901b76b9785ea16467c = new L.Control.Draw(
                 options
-            ).addTo( map_19ed3815acee26be64f59e532358b3d8 );
-            map_19ed3815acee26be64f59e532358b3d8.on(L.Draw.Event.CREATED, function(e) {
+            ).addTo( map_30172f30f85ebde19199055e09b67c82 );
+            map_30172f30f85ebde19199055e09b67c82.on(L.Draw.Event.CREATED, function(e) {
                 var layer = e.layer,
                     type = e.layerType;
                 var coords = JSON.stringify(layer.toGeoJSON());
@@ -111,7 +121,7 @@
                 });
                 drawnItems.addLayer(layer);
              });
-            map_19ed3815acee26be64f59e532358b3d8.on('draw:created', function(e) {
+            map_30172f30f85ebde19199055e09b67c82.on('draw:created', function(e) {
                 drawnItems.addLayer(e.layer);
             });
             

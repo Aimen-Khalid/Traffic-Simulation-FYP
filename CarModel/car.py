@@ -19,7 +19,7 @@ params = {
     "P_PARALLEL_DEC_WEIGHT": 20,
     "P_PARALLEL_ACC_WEIGHT": 0.5,
     "angle_threshold": 2.5,
-    "lookahead_time": 1.25
+    "lookahead_time": 1.5
 }
 
 
@@ -113,7 +113,6 @@ class Vehicle:
             dec_magnitude = -self.velocity.norm()#-1 * (0.5 * self.parallel_acc.norm())
             self.parallel_acc_sign = -1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
-            # print('stopping')
         elif abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
             dec_magnitude = (self.speed_lookahead.angle - radians(params["angle_threshold"])) * (-params["P_PARALLEL_DEC_WEIGHT"])
             self.parallel_acc_sign = -1 if dec_magnitude * (-params["P_PARALLEL_DEC_WEIGHT"]) < 0 else 1
@@ -183,7 +182,7 @@ class Vehicle:
         self.prev_face = self.current_face
 
     def update_state_vars(self):
-        if round(self.velocity.norm(), 2) <= 0.2 :
+        if round(self.velocity.norm(), 2) <= 0.5:
             return
         self.set_vehicle_front_mid_point()
         self.set_closest_point()

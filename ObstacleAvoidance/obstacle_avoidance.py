@@ -2,6 +2,32 @@ import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString, Polygon
 
 
+def translate_segment(segment, length, anticlockwise=False):
+    if anticlockwise:
+        length = -1 * length
+    start, end = segment
+
+    start = Point(start[0], start[1])
+    end = Point(end[0], end[1])
+    # Compute the vector representing the segment
+    dx = end.x - start.x
+    dy = end.y - start.y
+
+    vector_length = ((dx ** 2) + (dy ** 2)) ** 0.5
+    # Compute the cosine and sine of the angle between the vector and the x-axis
+    cos_theta = dx / vector_length
+    sin_theta = dy / vector_length
+
+    # Translate the starting and ending points of the segment
+    new_start_x = start.x + length * sin_theta
+    new_start_y = start.y - length * cos_theta
+    new_end_x = end.x + length * sin_theta
+    new_end_y = end.y - length * cos_theta
+
+    # Return the translated segment as a list of two tuples
+    return [(new_start_x, new_start_y), (new_end_x, new_end_y)]
+
+
 def find_point_index(point, polygon):
     for i, coord in enumerate(polygon.exterior.coords):
         if Point(coord).equals(point):
@@ -210,12 +236,12 @@ def get_road_halves(reference_track, road_polygon):
 
 
 
-def modify_reference_track_for_obstacles(obstacles, reference_track, road_polygon, road_separator):
+def modify_reference_track_for_obstacles(obstacles, reference_track, road_polygon):
     # road_half_1, road_half_2 = get_road_halves(LineString(road_separator), road_polygon)
     #
     for obstacle in obstacles:
         obstacle_centre = obstacle.centroid
-        buffer = obstacle_centre.buffer(7)
+        buffer = obstacle_centre.buffer(estimate_polygon_radius(obstacle))
     #
     #     if Polygon(road_half_1).contains(obstacle_centre):
     #         road = road_half_1
@@ -226,32 +252,79 @@ def modify_reference_track_for_obstacles(obstacles, reference_track, road_polygo
     #     else:
     #         return reference_track
 
-        reference_track = modify_reference_track(reference_track, buffer, road_polygon)
+        reference_track = modify_reference_track3(reference_track, obstacle, road_polygon)
 
     return reference_track
 
-# #
-# # # Example usage
-# road = Polygon([(3, 2), (3, 8), (19, 8), (19, 2)])
-# car = Point((5, 5))
-# reference_track = LineString([(19, 3), (5, 3)])
-# # obstacle = Polygon([(15, 6), (16.23, 4.53), (14.71, 3.89), (14.41, 5.59)])
-# #obstacle = Polygon([(13.82, 3.7), (12, 6), (13, 7), (14.96, 4.62)])
-# #obstacle = Polygon([(11, 4), (11, 6), (17, 6), (17, 4)]) # rectangle
-# #obstacle = Polygon([(11, 7.8), (7, 2.2), (17, 2.2)]) # triangle out of boundary
-# #obstacle = Polygon([(10.83, 6.01), (11.8, 4.4), (10.2, 4.6)]) # triangle inside road
-# #obstacle1 = Polygon([(10,6), (11,6), (12.14, 5.28), (12.16, 3.84), (10.94, 3.18), (9.3, 3.96)]) # hexagon
+
+def modify_reference_track3(reference_track, obstacle, road):
+    centroid = obstacle.centroid
+    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+3.5)
+    intersection_points = reference_track.intersection(buffer)
+    if intersection_points.is_empty:
+        # Handle case when there are less than two intersection points
+        return reference_track
+    intersection_coords = list(intersection_points.coords)
+
+
+
+    intersection_point1 = intersection_coords[0]  # start_point
+    intersection_point2 = intersection_coords[1]  # end_point
+
+    # swap = False
+    # if Point(reference_track.coords[0]).distance(Point(intersection_point1)) > Point(reference_track.coords[0]).distance(Point(intersection_point2)):
+    #     intersection_point1, intersection_point2 = intersection_point2, intersection_point1
+    #     swap = True
+
+
+    part1 = list(reference_track.coords)[:-1]
+
+    #clipped_boundary = clipped_buffer_boundary(buffer, start_point, end_point)
+
+    part2_1, part2_2 = get_polygon_halves(intersection_point1,  intersection_point2, buffer)
+    try:
+        part2 = part2_1 if road.contains(LineString(part2_1)) else part2_2
+    except Exception:
+        print('here')
+        part2 = part2_1
+    part3 = [intersection_point2, list(reference_track.coords)[-1]]
+
+
+    # if swap:
+    #     return LineString(part2)
+    # else:
+    if Point(part2[0]).distance(Point(part1[-1])) > Point(part2[-1]).distance(Point(part1[-1])):
+        part2.reverse()
+    return LineString(part1 + part2 + part3)
 #
-# obstacle1 = Point(15, 3).buffer(1)
-# obstacle2 = Point(10, 3).buffer(1)
-# obstacle_centre1 = obstacle1.centroid
-# buffer1 = obstacle1.buffer(1)
-# buffer2 = obstacle2.buffer(1)
-#
-# modified_track = modify_reference_track(reference_track, buffer1, road)
-# modified_track2 = modify_reference_track2(modified_track, buffer2, road)
-#
-# # for i, point in enumerate(buffer.exterior.coords):
-# #     print(i, point)
-#
-# plot_geometry(road, car, reference_track, obstacle1, buffer1, modified_track2)#=LineString([(1, 2), (3, 4)]))
+# # Example usage
+road = Polygon([(3, 2), (3, 8), (19, 8), (19, 2)])
+car = Point((5, 5))
+reference_track = LineString([(19, 3), (5, 3)])
+# obstacle = Polygon([(15, 6), (16.23, 4.53), (14.71, 3.89), (14.41, 5.59)])
+#obstacle = Polygon([(13.82, 3.7), (12, 6), (13, 7), (14.96, 4.62)])
+#obstacle = Polygon([(11, 4), (11, 6), (17, 6), (17, 4)]) # rectangle
+#obstacle = Polygon([(11, 7.8), (7, 2.2), (17, 2.2)]) # triangle out of boundary
+#obstacle = Polygon([(10.83, 6.01), (11.8, 4.4), (10.2, 4.6)]) # triangle inside road
+#obstacle1 = Polygon([(10,6), (11,6), (12.14, 5.28), (12.16, 3.84), (10.94, 3.18), (9.3, 3.96)]) # hexagon
+
+obstacle1 = Point(15, 3).buffer(1)
+obstacle2 = Point(10, 3).buffer(1)
+
+segment = [(8, 3), (10, 3)]
+translated_segment_cw = translate_segment(segment, 1)
+translated_segment_acw = translate_segment(segment, 1, anticlockwise=True)
+obstacle3 = Polygon([translated_segment_cw[0], translated_segment_cw[1], translated_segment_acw[1],
+                            translated_segment_acw[0]])
+
+obstacle_centre1 = obstacle1.centroid
+buffer1 = obstacle1.buffer(1)
+buffer3 = obstacle3.buffer(1)
+
+modified_track = modify_reference_track3(reference_track, obstacle3, road)
+# modified_track2 = modify_reference_track2(modified_track, buffer3, road)
+
+# for i, point in enumerate(buffer.exterior.coords):
+#     print(i, point)
+
+# plot_geometry(road, car, reference_track, obstacle3, buffer3, modified_track)#=LineString([(1, 2), (3, 4)]))

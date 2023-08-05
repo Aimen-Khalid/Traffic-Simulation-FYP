@@ -118,7 +118,7 @@ def get_points_on_graph(road_network, road_network_name):
         # round the point to the nearest grid point
         x = point[0][0]
         y = point[0][1]
-        ax.scatter(x, y, s=0.2)
+        ax.scatter(x, y, s=0.6)
         plt.draw()
         # add the point to the list of vertices if it hasn't already been added
         if (x, y) not in obstacles_positions:
@@ -129,7 +129,6 @@ def get_points_on_graph(road_network, road_network_name):
         # update previous point coordinates
         prev_x = x
         prev_y = y
-
 
 
 def main():

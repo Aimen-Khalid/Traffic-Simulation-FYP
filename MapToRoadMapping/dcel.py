@@ -1,7 +1,7 @@
 import math as m
 from matplotlib import patches
 from shapely.geometry import Polygon, Point, LineString
-import random
+from random import randint
 import matplotlib.pyplot as plt
 from Utility.geometry import get_intersection_point, lane_width, merge_line_strings
 from .generic_interpolation import path_interpolation
@@ -58,7 +58,6 @@ class Face:
     def __init__(self):
         self.name = None
         self.outer_component = None  # One half edge of the outer-cycle
-        self.fill_color = (random.random(), random.random(), random.random())
         self.polygon = None
         self.faces_inside = []
         self.adjacent_faces = []
@@ -158,7 +157,23 @@ class Face:
                 continue
             for adj_face_curve in adj_face.lane_curves:
                 end_point = (round(adj_face_curve[0][0], 2), round(adj_face_curve[0][1], 2))
-                start_point = (round(lane_curve.coords[1][0], 2), round(lane_curve.coords[1][1], 2))
+                start_point = (round(lane_curve.coords[-1][0], 2), round(lane_curve.coords[-1][1], 2))
+                if end_point == start_point:
+                    connected_curves.append(adj_face_curve)
+        return connected_curves
+
+    def get_connected_outer_curves(self, lane_curve):
+        connected_curves = []
+        for adj_face in self.adjacent_faces:
+            if adj_face.name == 'BBox':
+                continue
+            for i, adj_face_curve in enumerate(adj_face.lane_curves):
+                if adj_face.tag == JUNCTION and (i % 3 not in [0, 1]):
+                    continue
+                if adj_face.tag != JUNCTION and i in [1, 2]:
+                    continue
+                end_point = (round(adj_face_curve[0][0], 2), round(adj_face_curve[0][1], 2))
+                start_point = (round(lane_curve.coords[-1][0], 2), round(lane_curve.coords[-1][1], 2))
                 if end_point == start_point:
                     connected_curves.append(adj_face_curve)
         return connected_curves
@@ -485,12 +500,12 @@ class Dcel:
                     x, y = LineString(face.lane_curves[i]).xy
                     # for j in range(len(x)):
                     #     ax.scatter(x[j], y[j], s=2, color="red")
-
+                    #
                     # ax.scatter(x[0], y[0], s=font_size)
                     ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
                     #
                     # ax.scatter(x[1], y[1], s=font_size)
-                    ax.text(x[-1], y[-1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+                    # ax.text(x[-1], y[-1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
         boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
         for edge in boundary_edges:
@@ -509,12 +524,17 @@ class Dcel:
 
         x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
         y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
+        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
+        line.set_animated(False)
+
+        # ax.plot(x, y, color='white', linewidth=2, linestyle='dashed', dashes=[3, 3])
 
         x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
         y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-        ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
-
+        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
+        line.set_animated(False)
+        plt.draw()
+        # ax.plot(x, y, color='white', linewidth=2, linestyle='dashed', dashes=[3, 3])
 
     def plot_curves(self, ax, face):
         for i in range(len(face.lane_curves)):
@@ -522,8 +542,10 @@ class Dcel:
             y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
             if face.tag == JUNCTION:
                 x, y = LineString(face.lane_curves[i]).xy
-                # ax.plot(x, y, color='blue', linewidth=0.2)
-                # ax.scatter(x, y, color='red', s=0.5)
+                ax.plot(x, y, color='blue', linewidth=0.2)
+                # for j in range(len(x)-1):
+                    # ax.text(x[j], y[j], f'{int(x[j])}, {int(y[j])}', fontsize=6)
+                    # ax.scatter(x, y, color='red', s=0.8)
             else:
                 start_point = (x[0], y[0])
                 end_point = (x[1], y[1])
@@ -549,11 +571,11 @@ class Dcel:
             x = [edge.origin.x, edge.destination.x]
             y = [edge.origin.y, edge.destination.y]
             ax.plot(x, y, color='black')
-        # partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
+        partition_edges = [edge for edge in self.edges if edge.tag == PARTITION]
         # for edge in partition_edges:
         #     x = [edge.origin.x, edge.destination.x]
         #     y = [edge.origin.y, edge.destination.y]
-        #     ax.plot(x, y, color='white', linewidth=0.2)
+        #     ax.plot(x, y, color='white', linewidth=0.5)
 
     def show_road_network(self, axis=None, figure=None):
         fig, ax = plt.subplots()
@@ -573,7 +595,7 @@ class Dcel:
             if face.tag in [ROAD, JUNCTION]:
                 x, y = face.polygon.exterior.xy
                 grey = '#807E78'
-                ax.fill(x, y, color=grey, edgecolor=grey)
+                ax.fill(x, y, color=grey, edgecolor= grey)
             # if face.tag in [NON_ROAD]:
             #     x, y = face.polygon.exterior.xy
             #     ax.fill(x, y, color='#009A17', edgecolor='white', linewidth=10)
@@ -745,10 +767,13 @@ class Dcel:
                 face2 = self.faces[j]
                 # Check if face1 is contained within face2 or vice versa
 
-                if face1.polygon.within(face2.polygon) and face1 != face2:
-                    face2.faces_inside.append(face1)
-                elif face2.polygon.within(face1.polygon) and face1 != face2:
-                    face1.faces_inside.append(face2)
+                try:
+                    if face1.polygon.within(face2.polygon) and face1 != face2:
+                        face2.faces_inside.append(face1)
+                    elif face2.polygon.within(face1.polygon) and face1 != face2:
+                        face1.faces_inside.append(face2)
+                except Exception:
+                    raise ValueError("Increase the scaling factor or decrease the line width. The created road faces are overlapping")
 
 
         # Loop over each face
@@ -831,7 +856,10 @@ class Dcel:
 
         def connect_curves_sets(first_curve_index):
             potential_curves = get_potential_closest_curves(starting_face)
-            current_curve = starting_face.lane_curves[first_curve_index]
+            try:
+                current_curve = starting_face.lane_curves[first_curve_index]
+            except Exception:
+                raise ValueError("Decrease the lane width or increase scaling factor. Road polygons are overlapping.")
             master_curve = current_curve
             master_next_curve = starting_face.lane_curves[1 if first_curve_index == 0 else 2]
             for _ in range(len(face.adjacent_faces) - 1):
@@ -875,7 +903,7 @@ class Dcel:
                 return lane_curves_list[0]
             if index == 2:
                 return lane_curves_list[3]
-            return lane_curves_list[index]
+            # return lane_curves_list[index]
 
         def get_face_sequence():
             face_sequence = []
@@ -894,11 +922,11 @@ class Dcel:
 
         def create_track_from_faces(face_sequence):
             track = LineString([])
-
             for i, (face, node) in enumerate(face_sequence):
                 if face.tag == ROAD:
                     face_curve = LineString(get_lane_curve(node, face.lane_curves))
-                    face_curve = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, face_curve, face.polygon, face.road_separator)
+                    face_curve = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, face_curve,
+                                                                                         face.polygon)
                     track = merge_line_strings(LineString(track), face_curve)
                 if face.tag == JUNCTION:
                     if i == len(face_sequence) - 1:
@@ -906,14 +934,27 @@ class Dcel:
                     start_point = track.coords[-1]
                     end_point = get_lane_curve(node, face_sequence[i + 1][0].lane_curves)[0]
                     track_part = LineString([start_point, end_point])
-                    track_part = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, track_part, face.polygon, face.road_separator)
+                    start_point = (round(start_point[0], 2), round(start_point[1], 2))
+                    end_point = (round(end_point[0], 2), round(end_point[1], 2))
+                    for lane_curve in face.lane_curves:
+                        curve_start = (round(lane_curve[0][0], 2), round(lane_curve[0][1], 2))
+                        curve_end = (round(lane_curve[-1][0], 2), round(lane_curve[-1][1], 2))
+                        if curve_start == start_point and curve_end == end_point:
+                            track_part = LineString(lane_curve)
+
+                    track_part = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, track_part,
+                                                                                         face.polygon)
 
                     track = merge_line_strings(LineString(track), track_part)
             return track
 
         start_node = get_node_from_graph(self.graph, 'id', start_node_id)
         end_node = get_node_from_graph(self.graph, 'id', end_node_id)
+
         shortest_path_nodes = nx.shortest_path(self.graph, start_node, end_node)
+        if not shortest_path_nodes:
+            return None
+        # shortest_path_nodes.extend(nx.shortest_path(self.graph, end_node, start_node))
         face_sequence = get_face_sequence()
         # points = drawing_tool.get_points_on_graph(self, 'cars_initiation')
         # face_sequence = []
@@ -921,6 +962,46 @@ class Dcel:
         #     f = self.get_face_for_point(point)
         #     face_sequence.append((f, point))
         track = create_track_from_faces(face_sequence)
+        return track
+
+
+
+
+
+
+
+
+    def get_track1(self, start_node_id, end_node_id, obstacles):
+        track = LineString([])
+        road_faces = [face for face in self.faces if face.tag == ROAD]
+
+        lane_curve = LineString(road_faces[randint(0, len(road_faces)-1)].lane_curves[randint(0, 3)])
+
+        start_point = lane_curve.coords[0]
+        end_point = lane_curve.coords[1]
+        i = 0
+        while i < 8 or Point(track.coords[0]).distance(Point(track.coords[-1])) < 10:
+
+            track_part = lane_curve  #LineString([start_point, end_point])
+            mid_point = ((start_point[0] + end_point[0]) / 2,
+                         (start_point[1] + end_point[1]) / 2)
+            face = self.get_face_for_point(mid_point)
+            try:
+                track_part = obstacle_avoidance.modify_reference_track_for_obstacles(obstacles, track_part, face.polygon)
+            except Exception:
+                ValueError("Obstacles not created correctly")
+            track = merge_line_strings(LineString(track), track_part)
+            connected_curves = face.get_connected_curves(LineString(lane_curve))
+            if len(connected_curves) == 0:
+                return track
+            if not connected_curves:
+                print(face.name)
+            lane_curve = LineString(connected_curves[randint(0, len(connected_curves))-1])
+            # lane_curve = LineString(connected_curves[0])
+            start_point = lane_curve.coords[0]
+            end_point = lane_curve.coords[1]
+            i += 1
+
         return track
 
 

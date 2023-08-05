@@ -1,10 +1,11 @@
 import os
 import sys
 import matplotlib.pyplot as plt
-from shapely import Point, LineString, Polygon
+from shapely import Point, LineString, Polygon, box
 import networkx as nx
 import random
 import math
+from tqdm import tqdm
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.append(parent_dir)
@@ -15,7 +16,7 @@ from Utility.point import ScaledPoint
 from Utility import files_functions
 from SimulationEngine import simulation_with_vectors
 import MapToRoadMapping.osm
-from MapToRoadMapping.graph_to_road_network import show_graph_lanes
+from MapToRoadMapping.graph_to_road_network import show_graph_lanes, translate_segment
 from RoadBuildingTool.drawing_tool import draw_and_save_road_network_graph, get_vertices_and_segments, get_points_on_graph
 
 
@@ -28,9 +29,12 @@ https://drive.google.com/file/d/1s4K-4sUjk51QQ3viBoLcKz9DzYK-8FNi/view?usp=shari
 def show_graph(graph):
     node_positions = nx.get_node_attributes(graph, 'pos')
     node_ids = nx.get_node_attributes(graph, 'id')
-    for node, (x, y) in node_positions.items():
-        plt.text(x, y, str(node_ids[node]), fontsize=12, ha='center', va='center')
-    nx.draw(graph, pos=node_positions, node_size=5, font_size=8, with_labels=False)
+    # for node, (x, y) in node_positions.items():
+    #     plt.text(x, y, str(node_ids[node]), fontsize=12, ha='center', va='center')
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')  # Set equal aspect ratio
+    graph1 = nx.to_undirected(graph)
+    nx.draw(graph1, pos=node_positions, node_size=20, font_size=8, with_labels=False,)
     plt.show()
 
 
@@ -66,6 +70,7 @@ def show_saved_road_network(area_name):
     segments_fn = f"{area_name}_segments.txt"
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
     # show_graph(graph)
+    # show_graph_lanes(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
 
@@ -74,6 +79,7 @@ def show_saved_road_network(area_name):
 
 
 def get_road_network(area_name, new):
+    print("Road network creating...")
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
     if new:
@@ -83,6 +89,7 @@ def get_road_network(area_name, new):
     # show_graph(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
+    print("Road network created")
     return dcel_obj
 
 
@@ -111,15 +118,17 @@ def create_track(file_name, new):
     return LineString(track)
 
 
-def road_network_main(fn, new):
-    # coordinates = osm.get_coordinates_from_map()
-    # area_name = 'test'#input("Name the area that lies within the selected coordinates: ")
-    # show_road_network(coordinates, area_name)
+def road_network_main(fn, new_custom=False, new_from_map=False):
+    if new_from_map:
+        coordinates = osm.get_coordinates_from_map()
+        area_name = fn#input("Name the area that lies within the selected coordinates: ")
+        show_road_network(coordinates, area_name)
 
-    if new:
+    elif new_custom:
         create_custom_road_network(fn)
 
-    show_saved_road_network(fn)
+    else:
+        show_saved_road_network(fn)
 
 
 def simulate_on_track(frames, track_name, if_new_track):
@@ -133,43 +142,119 @@ def simulate_on_track(frames, track_name, if_new_track):
     simulation.plot_vehicle_tracking(vehicle, frames)
 
 
-def get_vehicles_list(no_of_vehicles, road_network, obstacles):
+def is_close_to_existing(point_list, given_point, distance_threshold):
+    for point in point_list:
+        distance = point.distance(given_point)
+        if distance < distance_threshold:
+            return True
+    return False
+
+
+def get_random_track(road_network, obstacles):
     no_of_nodes = road_network.graph.number_of_nodes() - 1
+    start_node_id = 0#random.randint(0, no_of_nodes)
+    end_node_id = 2#random.randint(0, no_of_nodes)
+    while start_node_id == end_node_id:
+        end_node_id = random.randint(0, no_of_nodes)
+    print(start_node_id, end_node_id)
+    track = road_network.get_track(start_node_id, end_node_id, obstacles)
+    # if track is None:
+    #     return get_random_track(road_network, obstacles)
+    return track
+
+
+def cut_last_segment_at_random(line_string):
+    if not line_string.is_empty and line_string.is_ring:
+        raise ValueError("Input LineString must not be empty and must not be a ring.")
+    last_segment = line_string.coords[-2:]
+    random_fraction = random.uniform(0.2, 0.8)  # Adjust the range as needed
+    x_cut = last_segment[0][0] + random_fraction * (last_segment[1][0] - last_segment[0][0])
+    y_cut = last_segment[0][1] + random_fraction * (last_segment[1][1] - last_segment[0][1])
+    new_line_coords = line_string.coords[:-1] + [(x_cut, y_cut)]
+    return LineString(new_line_coords)
+
+def get_vehicles_list(no_of_vehicles, road_network, obstacles):
+    print(f'{no_of_vehicles} vehicles being initialized...')
     vehicles_list = []
-    for _ in range(no_of_vehicles):
-        start_node_id = 0#random.randint(0, no_of_nodes)
-        end_node_id = 20#random.randint(0, no_of_nodes)
+    initial_positions = []
+    final_positions = []
+    obstacle_centroids = [obstacle.centroid for obstacle in obstacles]
+    with tqdm(total=no_of_vehicles) as pbar:
+        for _ in range(no_of_vehicles):
+            #  honda civic
+            if _ % 2 == 0:
+                length = 4.6
+                width = 1.8
+            else:
+                #  suzuki alto
+                length = 3.5
+                width = 1.5
+            init_speed = random.uniform(4, 8)
 
-        while start_node_id == end_node_id:
-            end_node_id = random.randint(0, no_of_nodes)
-        reference_track = road_network.get_track(start_node_id, end_node_id, obstacles)#start_node_id, end_node_id)
-        #honda civic
-        if _ % 2 == 0:
-            length = 4.6
-            width = 1.8
-        else:
-            length = 3.5
-            width = 1.5
-        init_speed = random.uniform(4, 8)
-        vehicle = car.Vehicle(length, width,
-                              centroid=ScaledPoint(reference_track.coords[0][0], reference_track.coords[0][1]),
-                              angle=90, velocity=initialize_velocity(reference_track, init_speed),
-                              acceleration=ScaledPoint(0, 0),
-                              reference_track=reference_track
-                              )
+            reference_track = get_random_track(road_network, obstacles)
+            segment = LineString([reference_track.coords[0], reference_track.coords[1]])
+            interpolation_distance = 0.1#random.uniform(0, 0.7) #* segment_length
 
-        vehicles_list.append(vehicle)
+            # initial_position = segment.interpolate(interpolation_distance, normalized=True)
+            initial_position = Point(reference_track.coords[0])
+            # if len(reference_track.coords) > 2:
+            #     reference_track = cut_last_segment_at_random(reference_track)
+            final_position = Point(reference_track.coords[-1])
+            iterations = 0
+            while is_close_to_existing(initial_positions, initial_position, 10) or is_close_to_existing(obstacle_centroids, initial_position, 0)\
+                    or is_close_to_existing(final_positions, final_position, 10):
+                print('in while loop')
+                reference_track = get_random_track(road_network, obstacles)
+                if Point(reference_track.coords[0]).distance(Point(reference_track.coords[-1])) < 50:
+                    continue
+                # rand_node_index = random.randint(0, len(reference_track.coords) - 2)
+                # segment = LineString([reference_track.coords[rand_node_index], reference_track.coords[rand_node_index + 1]])
+                # initial_position = segment.interpolate(random.random(), normalized=True)
+                segment = LineString([reference_track.coords[0], reference_track.coords[1]])
+                segment_length = Point(reference_track.coords[0]).distance(Point(reference_track.coords[1]))
+                interpolation_distance = 0.1#random.uniform(0, 0.7) #* segment_length
+                initial_position = segment.interpolate(interpolation_distance)
+
+                # if len(reference_track.coords) > 2:
+                #     reference_track = cut_last_segment_at_random(reference_track)
+                final_position = Point(reference_track.coords[-1])
+                iterations += 1
+            initial_positions.append(initial_position)
+            final_positions.append(final_position)
+            vehicle = car.Vehicle(length, width,
+                                  centroid=ScaledPoint(initial_position.x, initial_position.y),
+                                  angle=90, velocity=initialize_velocity(segment, init_speed),
+                                  acceleration=ScaledPoint(0, 0),
+                                  reference_track=reference_track
+                                  )
+
+            vehicles_list.append(vehicle)
+            pbar.update(1)
+    print('Vehicles initialized.')
     return vehicles_list
 
 
 def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_obstacles):
     road_network = get_road_network(road_network_name, new=if_new_network)
-    # if if_new_obstacles:
-    #     obstacles_positions = get_points_on_graph(road_network, road_network_name)
-    #     files_functions.write_vertices_to_file(obstacles_positions, f'{road_network_name}_obstacles_positions')
-    # else:
-    #     obstacles_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
-    # obstacle_radius = 2
+    try:
+        if if_new_obstacles:
+            obstacle_positions = get_points_on_graph(road_network, road_network_name)
+            files_functions.write_vertices_to_file(obstacle_positions, f'{road_network_name}_obstacles_positions')
+        else:
+            obstacle_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
+
+        obstacles = []
+        i = 0
+        while i <= len(obstacle_positions)-2:
+            segment = [obstacle_positions[i], obstacle_positions[i+1]]
+            translated_segment_cw = translate_segment(segment, 1)
+            translated_segment_acw = translate_segment(segment, 1, anticlockwise=True)
+            obstacles.append(Polygon([translated_segment_cw[0], translated_segment_cw[1], translated_segment_acw[1],
+                                        translated_segment_acw[0]]))
+            i += 2
+    except Exception:
+        print('Obstacles not initialized. Creating simulation without obstacles.')
+        obstacles = []
     # obstacles = [
     #     Point(position).buffer(obstacle_radius)
     #     for position in obstacles_positions
@@ -180,13 +265,13 @@ def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_o
 
 
 def simulation_main():
-    frames = 4000
+    frames = 100
     # simulate_on_track(frames, "hexagon", if_new_track=False)
-    simulate_on_road_network(frames, "full_network", if_new_network=False, if_new_obstacles=False)
+    simulate_on_road_network(frames, "my_road", if_new_network=False, if_new_obstacles=False)
 
     plt.close('all')
 
-# road_network_main("octagon", new=True)
+# road_network_main("my_road", new_from_map=False, new_custom=False)#MT
 
 
 simulation_main()
