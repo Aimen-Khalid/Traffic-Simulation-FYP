@@ -144,19 +144,24 @@ def update_parameters_list(vehicle, parameters):
     add_centroid(vehicle, parameters)
 
 
-def compute_parameters(vehicle, frames):
+def compute_parameters(vehicles, road_network, frames):
     print("Computation in progress...")
     start = time.time()
-    parameters = initialize_parameters_dict()
+    list_of_parameters_list = [
+        initialize_parameters_dict() for _ in range(len(vehicles))
+    ]
     # Use tqdm to display a progress bar while computing the parameters for each frame
     with tqdm(total=frames) as pbar:
         for _ in range(frames):
-            vehicle.update_state_vars()
-            update_parameters_list(vehicle, parameters)
+            for index, vehicle in enumerate(vehicles):
+                vehicle.update_state_vars(road_network)
+                update_parameters_list(vehicle, list_of_parameters_list[index])
             pbar.update(1)
+        print(vehicles[0].reference_track)
     end = time.time()
     print(f"{int(end - start)} Seconds")
-    return parameters
+
+    return list_of_parameters_list
 
 
 def plot_parameter(ax, frames, parameter_list, parameter_name, limit=None):
@@ -248,7 +253,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
 
     for vehicle in vehicles:
         x, y = vehicle.reference_track.xy
-        ax.plot(x, y, linewidth=1, color='green')
+        ax.plot(x, y, linewidth=2, color='#22b010', zorder=10)
 
     # vehicle_lines, trail_lines = get_artist_objects(ax, len(vehicles))
     vehicle_lines = get_artist_objects(ax, len(vehicles))
@@ -274,11 +279,11 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             y_min, y_max = ax.get_ylim()
             center_x = (x_min + x_max) / 2
             center_y = (y_min + y_max) / 2
-            window_size = 50
-            # ax.set_xlim(center_x - window_size, center_x + window_size)
-            # ax.set_ylim(center_y - window_size, center_y + window_size)
-            ax.set_xlim(parameters['centroid'][i].x - window_size, parameters['centroid'][i].x + window_size)
-            ax.set_ylim(parameters['centroid'][i].y - window_size, parameters['centroid'][i].y + window_size)
+            window_size = 120
+            ax.set_xlim(center_x - window_size, center_x + window_size)
+            ax.set_ylim(center_y - window_size, center_y + window_size)
+            # ax.set_xlim(parameters['centroid'][i].x - window_size, parameters['centroid'][i].x + window_size)
+            # ax.set_ylim(parameters['centroid'][i].y - window_size, parameters['centroid'][i].y + window_size)
 
         return_string = ""
         for i in range(len(vehicles)):
@@ -331,7 +336,7 @@ def calculate_tracking_accuracy(vehicle_trail, track):
 
 
 def create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network):
-    parameters_list = [compute_parameters(vehicle, frames) for vehicle in vehicles]
+    parameters_list = compute_parameters(vehicles, road_network, frames)
     plt.close('all')
     # write_parameters_to_file(parameters)
 
@@ -342,32 +347,31 @@ def create_simulation_video(vehicles, road_network, obstacles, frames, with_road
     #             f"dec {car.params['P_PARALLEL_DEC_WEIGHT']} threshold {car.params['angle_threshold']}" \
     #             f"lookahead_time {vehicle.turning_lookahead.time}" \
     #             f".mp4"
-    file_name = "video.mp4"
+    file_name = "anothervideotest.mp4"
     simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network)
     winsound.Beep(frequency=2500, duration=1000)
     # plot_parameters(vehicle, fig_name=file_name)
 
 
-def plot_vehicle_tracking(vehicles, frames, road_network=None):
-    parameters_list = [compute_parameters(vehicle, frames) for vehicle in vehicles]
+def plot_vehicle_tracking(vehicle, frames, road_network=None):
+    parameters_list = compute_parameters(vehicle, road_network, frames)
     plt.close('all')
     fig = plt.figure()
     ax = plt.gca()
     ax.axis("off")
     ax.set_aspect('equal', adjustable='box')
 
-    for i in range(len(vehicles)):
-        vehicle = vehicles[i]
-        parameters = parameters_list[i]
 
-        trail_x = parameters['trail_x']
-        trail_y = parameters['trail_y']
-        trail = list(zip(trail_x, trail_y))
-        tracking_metric_index = calculate_tracking_accuracy(trail, vehicle.reference_track)
-        print("Tracking metric index: ", tracking_metric_index)
-        ax.plot(trail_x, trail_y, linewidth=1, color=vehicle.trail_color, antialiased=True)
-        track_x, track_y = vehicle.reference_track.xy
-        ax.plot(track_x, track_y, linewidth=1, color=vehicle.track_color, antialiased=True)
+    parameters = parameters_list[i]
+
+    trail_x = parameters['trail_x']
+    trail_y = parameters['trail_y']
+    trail = list(zip(trail_x, trail_y))
+    tracking_metric_index = calculate_tracking_accuracy(trail, vehicle.reference_track)
+    print("Tracking metric index: ", tracking_metric_index)
+    ax.plot(trail_x, trail_y, linewidth=1, color=vehicle.trail_color, antialiased=True)
+    track_x, track_y = vehicle.reference_track.xy
+    ax.plot(track_x, track_y, linewidth=1, color=vehicle.track_color, antialiased=True)
 
     # description = f"\nKp Per: {car.params['P_PER_ACC_WEIGHT']} " \
     #               f"   Kd per: {car.params['D_PER_ACC_WEIGHT']} " \

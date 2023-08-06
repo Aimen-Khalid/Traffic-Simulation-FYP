@@ -59,7 +59,7 @@ def create_verts_and_segs_files_from_coords(coordinates, vertices_fn, segments_f
     for index, row in gdf.iterrows():
         coords = row['geometry'].coords
         for i, coord in enumerate(coords[:-1]):
-            scaling_factor = 10
+            scaling_factor = 30
             coords1 = (scaling_factor*coords[i][0], scaling_factor*coords[i][1])
             coords2 = (scaling_factor*coords[i + 1][0], scaling_factor*coords[i + 1][1])
             segment = [coords1, coords2]

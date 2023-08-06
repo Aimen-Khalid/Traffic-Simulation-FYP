@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import Point, LineString, Polygon, MultiLineString
 
-
+obstacles = []
+static_cars = []
 def translate_segment(segment, length, anticlockwise=False):
     if anticlockwise:
         length = -1 * length
@@ -34,42 +35,56 @@ def find_point_index(point, polygon):
             return i
     return -1  # Point not found
 
-
+def circle_legend_handler(legend, orig_handle, fontsize, handlebox):
+    from matplotlib.patches import Circle
+    x, y = handlebox.xdescent, handlebox.ydescent
+    width, height = handlebox.width, handlebox.height
+    radius = min(width, height) / 2.0
+    handlebox.add_artist(Circle([width/2.0, height/2.0], radius, facecolor=orig_handle.get_fc(), edgecolor='black'))
+import matplotlib.patches as mpatches
 def plot_geometry(road, car, reference_track, obstacle, buffer, modified_track):
     fig, ax = plt.subplots()
 
     # Plot the road
     x, y = road.exterior.xy
-    ax.plot(x, y, color='black', linewidth=2)
+    r = ax.fill(x, y, color='#807E78', linewidth=2, edgecolor='black', label='road')
 
     # Plot the car
-    x, y = car.xy
-    ax.plot(x, y, marker='o', markersize=10, color='red')
+    # x, y = car.xy
+    # ax.plot(x, y, marker='o', markersize=10, color='red')
 
     # Plot the reference track
     x, y = reference_track.xy
-    ax.plot(x, y, color='green', linewidth=2)
+    ax.plot(x, y, color='darkgreen', linewidth=2, label='track')
 
     # Plot the modified reference track
-    x, y = modified_track.xy
-    # ax.plot(x, y, marker='o', markersize=10, color='yellow')
-    ax.plot(x, y, color='red', linewidth=2)
+    # x, y = modified_track.xy
+    # ax.plot(x, y, color='darkgreen', linewidth=2.5, label='modified track')
 
     # Plot the obstacle and its buffer
     x, y = obstacle.exterior.xy
-    ax.plot(x, y, color='blue', linewidth=2)
+    ax.fill(x, y, color='blue', linewidth=2, label='obstacle')
 
-    x, y = buffer.exterior.xy
-    ax.plot(x, y, color='lightblue', linewidth=0.5)
+    # x, y = buffer.exterior.xy
+    # d = ax.plot(x, y, color='black', linewidth=0.5, label='deviation around obstacle')
 
     # Set axis limits and labels
-    ax.set_xlim(0, 20)
-    ax.set_ylim(0, 10)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 12)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_aspect('equal')
-
+    ax.set_xlim(2, 28)
     # Show the plot
+    ax.legend(fontsize='large')
+    from matplotlib.lines import Line2D
+
+    o = Line2D([], [], color="white", marker='o', markerfacecolor="blue", markersize=15)
+    road = Line2D([], [], color='#807E78', markerfacecolor='#807E78')
+    line3 = Line2D([], [], color="white", marker='o', markersize=5, markerfacecolor="slategray")
+    line4 = Line2D([], [], color="white", marker='o', markersize=10, markerfacecolor="slategray")
+    # plt.legend((o, road, t, d), ('obstacle', 'Thing 2', 'Thing 3', 'Thing 4'), numpoints=1, loc=1)
+    ax.axis('off')
     plt.show()
 
 
@@ -151,13 +166,6 @@ def modify_reference_track(reference_track, buffer, road):
 
     intersection_point1 = intersection_coords[0]  # start_point
     intersection_point2 = intersection_coords[1]  # end_point
-
-    # swap = False
-    # if Point(reference_track.coords[0]).distance(Point(intersection_point1)) > Point(reference_track.coords[0]).distance(Point(intersection_point2)):
-    #     intersection_point1, intersection_point2 = intersection_point2, intersection_point1
-    #     swap = True
-
-
     part1 = list(reference_track.coords)[:-1]
 
     #clipped_boundary = clipped_buffer_boundary(buffer, start_point, end_point)
@@ -251,35 +259,33 @@ def modify_reference_track_for_obstacles(obstacles, reference_track, road_polygo
     #         print("half 2")
     #     else:
     #         return reference_track
-
-        reference_track = modify_reference_track3(reference_track, obstacle, road_polygon)
+        try:
+            reference_track = modify_reference_track_dynamic(reference_track, obstacle, road_polygon)
+        except Exception:
+            print('error a gya')
+            print(f'track: {reference_track}, \nobstacle: {obstacle}, \nroad: {road_polygon.get_face_for_point(obstacle.centroid).polygon}')
+            x, y = reference_track.xy
+            plt.plot(x, y)
+            plt.show()
+            reference_track = modify_reference_track_dynamic(reference_track, obstacle, road_polygon)
+        reference_track = modify_reference_track_dynamic(reference_track, obstacle, road_polygon)
 
     return reference_track
 
 
 def modify_reference_track3(reference_track, obstacle, road):
     centroid = obstacle.centroid
-    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+3.5)
+    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+1)
     intersection_points = reference_track.intersection(buffer)
     if intersection_points.is_empty:
         # Handle case when there are less than two intersection points
         return reference_track
     intersection_coords = list(intersection_points.coords)
 
-
-
     intersection_point1 = intersection_coords[0]  # start_point
     intersection_point2 = intersection_coords[1]  # end_point
 
-    # swap = False
-    # if Point(reference_track.coords[0]).distance(Point(intersection_point1)) > Point(reference_track.coords[0]).distance(Point(intersection_point2)):
-    #     intersection_point1, intersection_point2 = intersection_point2, intersection_point1
-    #     swap = True
-
-
     part1 = list(reference_track.coords)[:-1]
-
-    #clipped_boundary = clipped_buffer_boundary(buffer, start_point, end_point)
 
     part2_1, part2_2 = get_polygon_halves(intersection_point1,  intersection_point2, buffer)
     try:
@@ -296,11 +302,85 @@ def modify_reference_track3(reference_track, obstacle, road):
     if Point(part2[0]).distance(Point(part1[-1])) > Point(part2[-1]).distance(Point(part1[-1])):
         part2.reverse()
     return LineString(part1 + part2 + part3)
-#
+
+
+def find_segment_indices(line, point):
+    # Ensure the input is a Point and a LineString
+    if not isinstance(point, Point):
+        point = Point(point)
+
+    # Get the projection of the point onto the line
+    projected_point = line.interpolate(line.project(point))
+
+    # Find the indices of the two coordinates between which the projected point lies
+    coordinates = list(line.coords)
+    index1 = None
+    index2 = None
+    for i in range(len(coordinates) - 1):
+        p1 = Point(coordinates[i])
+        p2 = Point(coordinates[i + 1])
+        segment = LineString([p1, p2])
+        if projected_point.distance(segment) < 1e-6:  # You can adjust this threshold value as needed
+            index1 = i
+            index2 = i + 1
+            break
+
+    return index1
+
+
+def modify_reference_track_dynamic(reference_track, obstacle, road_network):
+    centroid = obstacle.centroid
+    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+5)
+    intersection_points = reference_track.intersection(buffer)
+    if intersection_points.is_empty:
+        # Handle case when there are less than two intersection points
+        return reference_track
+    if isinstance(intersection_points, MultiLineString):
+        return reference_track
+    intersection_coords = list(intersection_points.coords)
+
+    intersection_point1 = intersection_coords[0]  # start_point
+    intersection_point2 = intersection_coords[1]  # end_point
+
+    index = find_segment_indices(reference_track, intersection_point1)
+
+    part1 = list(reference_track.coords)[:index+1]
+
+    part2_1, part2_2 = get_polygon_halves(intersection_point1,  intersection_point2, buffer)
+    part2_1_inside_roads = True
+    for coordinate in part2_1:
+        face = road_network.get_face_for_point(Point(coordinate[0], coordinate[1]))
+        if face is None:
+            part2_1_inside_roads = False
+            break
+    try:
+        if part2_1_inside_roads:
+            part2 = part2_1
+        else:
+            part2 = part2_2
+        # part2 = part2_1 if road_polygon.contains(LineString(part2_1)) else part2_2
+    except Exception:
+        print('here')
+        part2 = part2_1
+    index = find_segment_indices(reference_track, intersection_point2)
+    part3 = [intersection_point2]
+    part3.extend(list(reference_track.coords)[index+1:])
+    # part3 = list(reference_track.coords)[index + 2:]
+
+
+    # if swap:
+    #     return LineString(part2)
+    # else:
+    if Point(part2[0]).distance(Point(part1[-1])) > Point(part2[-1]).distance(Point(part1[-1])):
+        part2.reverse()
+
+    return LineString(part1 + part2 + part3)
+
+
 # # Example usage
-road = Polygon([(3, 2), (3, 8), (19, 8), (19, 2)])
+road = Polygon([(3, 1.5), (3, 6), (26, 6), (26, 1.5)])
 car = Point((5, 5))
-reference_track = LineString([(19, 3), (5, 3)])
+reference_track = LineString([(5, 3), (25, 3)])
 # obstacle = Polygon([(15, 6), (16.23, 4.53), (14.71, 3.89), (14.41, 5.59)])
 #obstacle = Polygon([(13.82, 3.7), (12, 6), (13, 7), (14.96, 4.62)])
 #obstacle = Polygon([(11, 4), (11, 6), (17, 6), (17, 4)]) # rectangle
@@ -311,7 +391,7 @@ reference_track = LineString([(19, 3), (5, 3)])
 obstacle1 = Point(15, 3).buffer(1)
 obstacle2 = Point(10, 3).buffer(1)
 
-segment = [(8, 3), (10, 3)]
+segment = [(12, 3), (14, 3)]
 translated_segment_cw = translate_segment(segment, 1)
 translated_segment_acw = translate_segment(segment, 1, anticlockwise=True)
 obstacle3 = Polygon([translated_segment_cw[0], translated_segment_cw[1], translated_segment_acw[1],
@@ -319,9 +399,9 @@ obstacle3 = Polygon([translated_segment_cw[0], translated_segment_cw[1], transla
 
 obstacle_centre1 = obstacle1.centroid
 buffer1 = obstacle1.buffer(1)
-buffer3 = obstacle3.buffer(1)
+buffer3 = obstacle3.centroid.buffer(estimate_polygon_radius(obstacle3)+1)
 
-modified_track = modify_reference_track3(reference_track, obstacle3, road)
+# modified_track = modify_reference_track3(reference_track, obstacle3, road)
 # modified_track2 = modify_reference_track2(modified_track, buffer3, road)
 
 # for i, point in enumerate(buffer.exterior.coords):

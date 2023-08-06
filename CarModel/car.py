@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import Utility.geometry
 from math import cos, sin, radians
 from Utility.point import ScaledPoint
-from shapely import Point, LineString
+from shapely import Point, LineString, Polygon
 from shapely.ops import nearest_points
 from shapely.ops import linemerge
 from shapely.ops import split
 from Utility import geometry
+from ObstacleAvoidance import obstacle_avoidance
 
 # constants
 params = {
@@ -56,7 +57,8 @@ class Vehicle:
         self.centroid = centroid
         self.front_mid_point = None
         self.speed_lookahead = Lookahead(time=params['lookahead_time'])
-        self.turning_lookahead = Lookahead(time=params['lookahead_time'], distance=self.goal_speed * self.speed_lookahead.time - 5)
+        self.turning_lookahead = Lookahead(time=params['lookahead_time'],
+                                           distance=self.goal_speed * self.speed_lookahead.time - 5)
         self.closest_point = None
         self.angle = angle
         self.velocity = velocity
@@ -70,6 +72,7 @@ class Vehicle:
         self.current_face = None
         self.prev_face = None
         self.face_mid_point = None
+        self.stopped = False
 
     def state_to_corners(self):
         """Returns car's four points using centroid and vehicle orientation"""
@@ -95,10 +98,11 @@ class Vehicle:
         derivative_error = self.turning_lookahead.error - self.prev_error
 
         perpendicular_acc_magnitude = (params["P_PER_ACC_WEIGHT"] * proportional_error) + \
-                                    (params["D_PER_ACC_WEIGHT"] * derivative_error)
+                                      (params["D_PER_ACC_WEIGHT"] * derivative_error)
         self.perpendicular_acc_sign = -1 if perpendicular_acc_magnitude < 0 else 1
 
-        self.perpendicular_acc = geometry.get_vector(self.theta + (self.angle * 180 / math.pi), perpendicular_acc_magnitude)
+        self.perpendicular_acc = geometry.get_vector(self.theta + (self.angle * 180 / math.pi),
+                                                     perpendicular_acc_magnitude)
         self.perpendicular_acc = geometry.keep_in_limit(self.perpendicular_acc, self.acc_limit)
 
         if self.velocity.norm() >= self.goal_speed:
@@ -110,11 +114,12 @@ class Vehicle:
         if destination_point.distance(self.front_mid_point) < 2 * breaking_distance:
             self.in_breaking_distance = True
         if self.in_breaking_distance:
-            dec_magnitude = -self.velocity.norm()#-1 * (0.5 * self.parallel_acc.norm())
+            dec_magnitude = -self.velocity.norm()  # -1 * (0.5 * self.parallel_acc.norm())
             self.parallel_acc_sign = -1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
         elif abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
-            dec_magnitude = (self.speed_lookahead.angle - radians(params["angle_threshold"])) * (-params["P_PARALLEL_DEC_WEIGHT"])
+            dec_magnitude = (self.speed_lookahead.angle - radians(params["angle_threshold"])) * (
+                -params["P_PARALLEL_DEC_WEIGHT"])
             self.parallel_acc_sign = -1 if dec_magnitude * (-params["P_PARALLEL_DEC_WEIGHT"]) < 0 else 1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
             # print('turning')
@@ -181,8 +186,26 @@ class Vehicle:
     def set_prev_face(self):
         self.prev_face = self.current_face
 
-    def update_state_vars(self):
+    def modify_track_around_obstacles(self, road_network):
+        obstacles = obstacle_avoidance.obstacles + obstacle_avoidance.static_cars
+        # if obstacle.centroid.distance(Point(self.centroid.x, self.centroid.y)) < 10:
+        self.reference_track = obstacle_avoidance.modify_reference_track_for_obstacles(
+            obstacles, self.reference_track, road_network)
+        return
+
+    def add_to_obstacles(self):
+        x, y = self.get_xy_lists()
+        x = [round(i, 2) for i in x]
+        y = [round(i, 2) for i in y]
+        obstacle = Polygon(list(zip(x, y)))
+        obstacle_avoidance.static_cars.append(obstacle)
+
+    def update_state_vars(self, road_network):
+        if self.stopped:
+            return
         if round(self.velocity.norm(), 2) <= 0.5:
+            self.stopped = True
+            self.add_to_obstacles()
             return
         self.set_vehicle_front_mid_point()
         self.set_closest_point()
@@ -194,6 +217,7 @@ class Vehicle:
         self.set_velocity()
         self.set_centroid()
         self.set_orientation()
+        self.modify_track_around_obstacles(road_network)
 
     def get_xy_lists(self):
         p = self.state_to_corners()
@@ -218,7 +242,8 @@ class Vehicle:
 
     def get_lookahead_angle_magnitude(self, angle_type):
         """Returns lookahead angle magnitude in radians"""
-        headed_direction = (self.front_mid_point, Point(self.velocity.x + self.front_mid_point.x, self.velocity.y + self.front_mid_point.y))
+        headed_direction = (
+        self.front_mid_point, Point(self.velocity.x + self.front_mid_point.x, self.velocity.y + self.front_mid_point.y))
         if angle_type == "turning":
             track_direction = (self.front_mid_point, self.turning_lookahead.point)
         else:
@@ -238,7 +263,8 @@ class Vehicle:
     def get_error_sign(self, error_type):
         # returns sign of perpendicular acceleration error term
         segment_point_1 = Point(self.front_mid_point.x, self.front_mid_point.y)
-        segment_point_2 = Point(self.velocity.get_x() + self.front_mid_point.x, self.velocity.get_y() + self.front_mid_point.y)
+        segment_point_2 = Point(self.velocity.get_x() + self.front_mid_point.x,
+                                self.velocity.get_y() + self.front_mid_point.y)
 
         # translating the points to origin
         if error_type == "turning":
@@ -274,11 +300,10 @@ class Vehicle:
             else:
                 next_curve = connected_curves[2]
             self.reference_track = geometry.merge_line_strings(self.reference_track, LineString(next_curve))
-            mid_point = ((next_curve[0][0] + next_curve[1][0])/2, (next_curve[0][1] + next_curve[1][1])/2)
+            mid_point = ((next_curve[0][0] + next_curve[1][0]) / 2, (next_curve[0][1] + next_curve[1][1]) / 2)
             self.current_face = road_network.get_face_for_point(mid_point)
             if self.current_face == starting_face:
                 return
             last_curve = LineString(list(self.reference_track.coords)[-2:])
             connected_curves = self.current_face.get_connected_curves(last_curve)
         self.current_face = starting_face
-
