@@ -18,7 +18,7 @@ params = {
     "D_PER_ACC_WEIGHT": 20,
     "P_PER_ACC_WEIGHT": 10,
     "P_PARALLEL_DEC_WEIGHT": 20,
-    "P_PARALLEL_ACC_WEIGHT": 0.5,
+    "P_PARALLEL_ACC_WEIGHT":0.5,
     "angle_threshold": 2.5,
     "lookahead_time": 1.5
 }
@@ -114,7 +114,7 @@ class Vehicle:
         if destination_point.distance(self.front_mid_point) < 2 * breaking_distance:
             self.in_breaking_distance = True
         if self.in_breaking_distance:
-            dec_magnitude = -self.velocity.norm()  # -1 * (0.5 * self.parallel_acc.norm())
+            dec_magnitude = -self.velocity.norm()
             self.parallel_acc_sign = -1
             self.parallel_acc = (self.velocity / self.velocity.norm()) * dec_magnitude
         elif abs(self.speed_lookahead.angle) > radians(params["angle_threshold"]):
@@ -153,8 +153,8 @@ class Vehicle:
     def get_circle_intersection_point(self, circle_radius):
         circle_center = self.front_mid_point
         vel_vector = Point(self.velocity.get_x(), self.velocity.get_y())
-        circle = circle_center.buffer(circle_radius)  # Create a circle geometry
-        boundary = circle.boundary  # Get the boundary of the circle
+        circle = circle_center.buffer(circle_radius)
+        boundary = circle.boundary
         intersection = boundary.intersection(self.reference_track)
         if intersection.is_empty:
             closest_point, _ = nearest_points(self.reference_track, self.front_mid_point)
@@ -188,10 +188,11 @@ class Vehicle:
 
     def modify_track_around_obstacles(self, road_network):
         obstacles = obstacle_avoidance.obstacles + obstacle_avoidance.static_cars
-        # if obstacle.centroid.distance(Point(self.centroid.x, self.centroid.y)) < 10:
-        self.reference_track = obstacle_avoidance.modify_reference_track_for_obstacles(
-            obstacles, self.reference_track, road_network)
-        return
+        for obstacle in obstacles:
+            if obstacle.centroid.distance(Point(self.centroid.x, self.centroid.y)) < 50:
+                # print('modifying path')
+                self.reference_track = obstacle_avoidance.modify_reference_track_for_obstacles(
+                    [obstacle], self.reference_track, road_network)
 
     def add_to_obstacles(self):
         x, y = self.get_xy_lists()

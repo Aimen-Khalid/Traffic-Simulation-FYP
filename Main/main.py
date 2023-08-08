@@ -45,7 +45,6 @@ def initialize_velocity(reference_track, magnitude):
     end = end * magnitude
     return end
 
-
 def get_random_color():
     # Generate random values for red, green, and blue channels
     red = random.randint(0, 255)
@@ -69,7 +68,7 @@ def show_saved_road_network(area_name):
     vertices_fn = f"{area_name}_vertices.txt"
     segments_fn = f"{area_name}_segments.txt"
     graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
-    # show_graph(graph)
+    show_graph(graph)
     # show_graph_lanes(graph)
     dcel_obj = dcel.Dcel(graph)
     dcel_obj.build_dcel(graph)
@@ -152,8 +151,8 @@ def is_close_to_existing(point_list, given_point, distance_threshold):
 
 def get_random_track(road_network, obstacles):
     no_of_nodes = road_network.graph.number_of_nodes() - 1
-    start_node_id = 8#random.randint(0, no_of_nodes)#8
-    end_node_id = 0#random.randint(0, no_of_nodes)#0
+    start_node_id = random.randint(0, no_of_nodes)#8
+    end_node_id = random.randint(0, no_of_nodes)#0
     while start_node_id == end_node_id:
         end_node_id = random.randint(0, no_of_nodes)
     # print(start_node_id, end_node_id)
@@ -187,35 +186,36 @@ def get_vehicles_list(no_of_vehicles, road_network, obstacles):
                 #  suzuki alto
                 length = 3.5
                 width = 1.5
-            length = 5#4.6
-            width = 2#1.8
-            init_speed = 6#random.uniform(4, 8)
+
+            init_speed = random.uniform(4, 8)
 
             reference_track = get_random_track(road_network, obstacles)
             segment = LineString([reference_track.coords[0], reference_track.coords[1]])
-            interpolation_distance = 0.1#random.uniform(0.1, 0.7) #* segment_length
+            interpolation_distance = random.uniform(0.1, 0.7) #* segment_length
 
             initial_position = segment.interpolate(interpolation_distance, normalized=True)
-            # if len(reference_track.coords) > 2:
-            #     reference_track = cut_last_segment_at_random(reference_track)
+            if len(reference_track.coords) > 2:
+                reference_track = cut_last_segment_at_random(reference_track)
             final_position = Point(reference_track.coords[-1])
             iterations = 0
-            while is_close_to_existing(initial_positions, initial_position, 20) or is_close_to_existing(obstacle_centroids, initial_position, 5)\
-                    or is_close_to_existing(final_positions, final_position, 20):
+            while is_close_to_existing(initial_positions, initial_position, 6) or is_close_to_existing(obstacle_centroids, initial_position, 5)\
+                or is_close_to_existing(final_positions, final_position, 6):
                 # print('in while loop')
                 reference_track = get_random_track(road_network, obstacles)
-                if Point(reference_track.coords[0]).distance(Point(reference_track.coords[-1])) < 20:
-                    continue
+                # if len(reference_track.coords) < 3:
+                #     continue
+                # if Point(reference_track.coords[0]).distance(Point(reference_track.coords[-1])) < 20:
+                #     continue
                 # rand_node_index = random.randint(0, len(reference_track.coords) - 2)
                 # segment = LineString([reference_track.coords[rand_node_index], reference_track.coords[rand_node_index + 1]])
                 # initial_position = segment.interpolate(random.random(), normalized=True)
                 segment = LineString([reference_track.coords[0], reference_track.coords[1]])
                 segment_length = Point(reference_track.coords[0]).distance(Point(reference_track.coords[1]))
-                interpolation_distance = 0.1#random.uniform(0.1, 0.7) #* segment_length
+                interpolation_distance = random.uniform(0.1, 0.7) #* segment_length
                 initial_position = segment.interpolate(interpolation_distance)
 
-                # if len(reference_track.coords) > 2:
-                #     reference_track = cut_last_segment_at_random(reference_track)
+                if len(reference_track.coords) > 2:
+                    reference_track = cut_last_segment_at_random(reference_track)
                 final_position = Point(reference_track.coords[-1])
                 iterations += 1
             initial_positions.append(initial_position)
@@ -256,24 +256,24 @@ def simulate_on_road_network(frames, road_network_name, if_new_network, if_new_o
         print('Obstacles not initialized. Creating simulation without obstacles.')
         obstacles = []
 
-    # obstacle_avoidance.obstacles = obstacles
+    obstacle_avoidance.obstacles = obstacles
     # obstacles = [
     #     Point(position).buffer(obstacle_radius)
     #     for position in obstacles_positions
     # ]
-    obstacles = []
-    vehicles = get_vehicles_list(1, road_network, obstacles)
+    # obstacles = []
+    vehicles = get_vehicles_list(50, road_network, obstacles)
     simulation.create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network=True)
 
 
 def simulation_main():
-    frames = 1#
+    frames = 5000
     # simulate_on_track(frames, "hexagon", if_new_track=False)
     simulate_on_road_network(frames, "dha", if_new_network=False, if_new_obstacles=False)
 
     plt.close('all')
 
-# road_network_main("test", new_from_map=False, new_custom=False)#MT
+# road_network_main("full_network", new_from_map=False, new_custom=False)#MT
 
 
 simulation_main()

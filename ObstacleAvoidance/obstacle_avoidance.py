@@ -350,7 +350,7 @@ def modify_reference_track_dynamic(reference_track, obstacle, road_network):
     part2_1_inside_roads = True
     for coordinate in part2_1:
         face = road_network.get_face_for_point(Point(coordinate[0], coordinate[1]))
-        if face is None:
+        if face is None or face.tag == 2: # non-road
             part2_1_inside_roads = False
             break
     try:

@@ -502,30 +502,30 @@ class Dcel:
         for face in self.faces:
             x_, y_ = face.polygon.centroid.x, face.polygon.centroid.y
             ax.text(x_, y_, face.name)
-            if face.tag in [ROAD, JUNCTION]:
-                for i in range(len(face.lane_curves)):
-                    x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
-                    y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
-
-                    x, y = LineString(face.lane_curves[i]).xy
-                    # for j in range(len(x)):
-                    #     ax.scatter(x[j], y[j], s=2, color="red")
-                    #
-                    # ax.scatter(x[0], y[0], s=font_size)
-                    ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
-                    #
-                    # ax.scatter(x[1], y[1], s=font_size)
-                    # ax.text(x[-1], y[-1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
-
-        boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
-        for edge in boundary_edges:
-            x = [edge.origin.x, edge.destination.x]
-            y = [edge.origin.y, edge.destination.y]
-            ax.plot(x, y, color='black')
-            ax.scatter(x[0], y[0], s=font_size)
-            ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
-            ax.scatter(x[1], y[1], s=font_size)
-            ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+            # if face.tag in [ROAD, JUNCTION]:
+        #         for i in range(len(face.lane_curves)):
+        #             x = [face.lane_curves[i][0][0], face.lane_curves[i][1][0]]
+        #             y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
+        #
+        #             x, y = LineString(face.lane_curves[i]).xy
+        #             # for j in range(len(x)):
+        #             #     ax.scatter(x[j], y[j], s=2, color="red")
+        #             #
+        #             # ax.scatter(x[0], y[0], s=font_size)
+        #             ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+        #             #
+        #             # ax.scatter(x[1], y[1], s=font_size)
+        #             # ax.text(x[-1], y[-1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
+        #
+        # boundary_edges = [edge for edge in self.edges if edge.tag == BOUNDARY]
+        # for edge in boundary_edges:
+        #     x = [edge.origin.x, edge.destination.x]
+        #     y = [edge.origin.y, edge.destination.y]
+        #     ax.plot(x, y, color='black')
+        #     ax.scatter(x[0], y[0], s=font_size)
+        #     ax.text(x[0], y[0], f'{int(x[0])}, {int(y[0])}', fontsize=font_size)
+        #     ax.scatter(x[1], y[1], s=font_size)
+        #     ax.text(x[1], y[1], f'{int(x[1])}, {int(y[1])}', fontsize=font_size)
 
     def plot_separators(self, ax, face):
         x = [face.road_separator[0][0], face.road_separator[1][0]]
@@ -534,14 +534,14 @@ class Dcel:
 
         x = [face.lane_separators[0][0][0], face.lane_separators[0][1][0]]
         y = [face.lane_separators[0][0][1], face.lane_separators[0][1][1]]
-        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
+        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5], zorder=10)
         # line.set_animated(False)
 
         # ax.plot(x, y, color='white', linewidth=2, linestyle='dashed', dashes=[3, 3])
 
         x = [face.lane_separators[1][0][0], face.lane_separators[1][1][0]]
         y = [face.lane_separators[1][0][1], face.lane_separators[1][1][1]]
-        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5])
+        line, = ax.plot(x, y, color='white', linewidth=3, linestyle='dashed', dashes=[5, 5], zorder=10)
         # line.set_animated(False)
         plt.draw()
         # ax.plot(x, y, color='white', linewidth=2, linestyle='dashed', dashes=[3, 3])
@@ -552,7 +552,7 @@ class Dcel:
             y = [face.lane_curves[i][0][1], face.lane_curves[i][1][1]]
             if face.tag == JUNCTION:
                 x, y = LineString(face.lane_curves[i]).xy
-                ax.plot(x, y, color='blue', linewidth=0.5)
+                # ax.plot(x, y, color='blue', linewidth=0.5)
                 # for j in range(len(x)-1):
                     # ax.text(x[j], y[j], f'{int(x[j])}, {int(y[j])}', fontsize=6)
                     # ax.scatter(x, y, color='red', s=0.8)

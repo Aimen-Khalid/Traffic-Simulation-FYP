@@ -157,7 +157,6 @@ def compute_parameters(vehicles, road_network, frames):
                 vehicle.update_state_vars(road_network)
                 update_parameters_list(vehicle, list_of_parameters_list[index])
             pbar.update(1)
-        print(vehicles[0].reference_track)
     end = time.time()
     print(f"{int(end - start)} Seconds")
 
@@ -212,7 +211,7 @@ def get_artist_objects(ax, no_of_vehicles):
     # trail_lines = []
 
     for _ in range(no_of_vehicles):
-        vehicle_line, = ax.fill([], [], color='red', edgecolor='black', zorder=12)
+        vehicle_line, = ax.fill([], [], color='red', edgecolor='black', zorder=13)
 
         # car_image = plt.imread('car_image.png')
 
@@ -232,7 +231,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     matplotlib.use('Agg')
 
     screen_resolution = (1920, 1080)
-    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=200)
+    fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=180)
 
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
@@ -246,14 +245,14 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
 
     for obstacle in obstacles:
         x, y = obstacle.exterior.xy
-        ax.fill(x, y, color='blue', zorder=11)
+        ax.fill(x, y, color='blue', zorder=12)
         # buffer = obstacle.centroid.buffer(6)
         # x, y = buffer.exterior.xy
         # ax.plot(x, y, color='yellow', linewidth=0.6)
 
-    for vehicle in vehicles:
-        x, y = vehicle.reference_track.xy
-        ax.plot(x, y, linewidth=2, color='#22b010', zorder=10)
+    # for vehicle in vehicles:
+    #     x, y = vehicle.reference_track.xy
+    #     ax.plot(x, y, linewidth=2, color='darkgreen', zorder=10)##0ccb36
 
     # vehicle_lines, trail_lines = get_artist_objects(ax, len(vehicles))
     vehicle_lines = get_artist_objects(ax, len(vehicles))
