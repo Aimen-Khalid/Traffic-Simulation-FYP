@@ -1,16 +1,12 @@
 import folium
 from folium.plugins import Draw, Search, Geocoder
-import requests
 import json
-import pandas as pd
-import os
 import tkinter as tk
 from tkinter import filedialog
 import webbrowser
-import time
 
 
-def get_coordinates_from_map():
+def select_map_region():
     m = folium.Map(location=[31.5633366, 74.3296802], zoom_start=16)
     Geocoder().add_to(m)
     draw = Draw(export=True, filename='coordinates.geojson')
@@ -31,7 +27,7 @@ def get_coordinates_from_map():
 
 
 def main():
-    coordinates = get_coordinates_from_map()
+    coordinates = select_map_region()
     print("Coordinates picked from map: ", coordinates)
 
 

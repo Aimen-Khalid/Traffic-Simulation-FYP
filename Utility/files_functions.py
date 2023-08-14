@@ -1,28 +1,28 @@
-import osmnx
-from shapely import Polygon
-import networkx as nx
-from .geometry import lane_width
-
-
-def write_vertices_to_file(vertices, file_name):
-    with open(file_name, "w") as file:
+def write_vertices_to_file(vertices, area_name):
+    with open(f'{area_name}_vertices.txt', "w") as file:
         for vertex in vertices:
             for coordinate in vertex:
                 file.write(str(coordinate) + "\t")
             file.write("\n")
 
 
-def load_vertices_from_file(file_name):
+def load_vertices_from_file(area_name):
+    file_name = f'{area_name}_vertices.txt'
     vertices = []
-    with open(file_name, "r") as file:
-        for line in file:
-            vertex = tuple(float(x) for x in line.strip().split('\t'))
-            vertices.append(vertex)
+    try:
+        with open(file_name, "r") as file:
+            for line in file:
+                vertex = tuple(float(x) for x in line.strip().split('\t'))
+                vertices.append(vertex)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f'{file_name} does not exist. Create vertices file and name as areaname_vertices.txt'
+        ) from e
     return vertices
 
 
-def write_segments_to_file(segments, file_name):
-    with open(file_name, "w") as file:
+def write_segments_to_file(segments, area_name):
+    with open(f'{area_name}_segments.txt', "w") as file:
         for segment in segments:
             for vertices in segment:
                 for vertex in vertices:
@@ -30,9 +30,9 @@ def write_segments_to_file(segments, file_name):
             file.write("\n")
 
 
-def load_segments_from_file(file_name):
+def load_segments_from_file(area_name):
     segments = []
-    with open(file_name, "r") as file:
+    with open(f'{area_name}_segments.txt', "r") as file:
         for line in file:
             vertices = [float(x) for x in line.strip().split("\t")]
             segment = [(vertices[0], vertices[1]), (vertices[2], vertices[3])]
@@ -40,56 +40,10 @@ def load_segments_from_file(file_name):
     return segments
 
 
-def create_verts_and_segs_files_from_coords(coordinates, vertices_fn, segments_fn):
-    tags = {
-        "highway": ["primary", "secondary", "tertiary", "residential", "living_street", "service", "roads"]
-    }
-
-    geom = Polygon(coordinates)
-
-    gdf = osmnx.geometries_from_polygon(geom, tags=tags)
-    if len(gdf) == 0:
-        raise ValueError("Selected region has no roads")
-
-    gdf = osmnx.projection.project_gdf(gdf, to_crs='EPSG:3857', to_latlong=False)
-
-    gdf = gdf[['geometry']]
-    segments = []
-    vertices = []
-    for index, row in gdf.iterrows():
-        coords = row['geometry'].coords
-        for i, coord in enumerate(coords[:-1]):
-            scaling_factor = 30
-            coords1 = (scaling_factor*coords[i][0], scaling_factor*coords[i][1])
-            coords2 = (scaling_factor*coords[i + 1][0], scaling_factor*coords[i + 1][1])
-            segment = [coords1, coords2]
-            vertices.extend((coords1, coords2))
-            segments.append(segment)
-
-    gdf = osmnx.projection.project_gdf(gdf, to_crs='EPSG:3857', to_latlong=False)
-    write_vertices_to_file(vertices, vertices_fn)
-    write_segments_to_file(segments, segments_fn)
 
 
-def create_graph_from_files(vertices_fn, segments_fn):
-    graph = nx.DiGraph()
-    # Add vertices to the graph
-    vertices_ = list(set(load_vertices_from_file(vertices_fn)))
-    segments_ = load_segments_from_file(segments_fn)
-
-    # Add nodes to the graph with their specific positions
-    for i, vertex in enumerate(vertices_):
-        graph.add_node(vertex, pos=vertex, id=i)
-    # Add edges to the graph
-    for segment in segments_:
-        graph.add_edge(segment[0], segment[1], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None, lane_width=lane_width)
-        graph.add_edge(segment[1], segment[0], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None, lane_width=lane_width)
-    return graph
 
 
-def extract_road_network_graph(coordinates, area_name):
-    vertices_fn = f"{area_name}_vertices.txt"
-    segments_fn = f"{area_name}_segments.txt"
-    create_verts_and_segs_files_from_coords(coordinates, vertices_fn, segments_fn)
-    graph = create_graph_from_files(vertices_fn, segments_fn)
-    return graph
+
+
+

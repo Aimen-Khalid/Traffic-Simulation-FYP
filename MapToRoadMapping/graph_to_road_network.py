@@ -1,18 +1,10 @@
-import os
-import sys
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
-sys.path.append(parent_dir)
-
 import math
-from shapely import Point, LineString
-from Utility import files_functions
+from shapely import Point
 import networkx as nx
-# from rtree import index
-from Utility import geometry
 import matplotlib.pyplot as plt
 
+from RUSTIC.Utility.geometry import get_intersection_point
+from RUSTIC.settings import road_width
 
 
 def translate_segment(segment, length, anticlockwise=False):
@@ -77,8 +69,8 @@ def get_edge_attribute(graph, edge, atr_name):
 def set_edge2_translated_points(graph, outgoing_edge):
     if graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is not None:
         return
-    cw_start = translate_segment(outgoing_edge, geometry.lane_width)[0]
-    acw_start = translate_segment(outgoing_edge, geometry.lane_width, anticlockwise=True)[0]
+    cw_start = translate_segment(outgoing_edge, road_width)[0]
+    acw_start = translate_segment(outgoing_edge, road_width, anticlockwise=True)[0]
     if graph.get_edge_data(outgoing_edge[0], outgoing_edge[1])['cw_start'] is None:
 
         nx.set_edge_attributes(graph, {
@@ -99,8 +91,8 @@ def set_edges_translated_points(graph, edges, translated_segments_cw, translated
             segment4 = translated_segments_cw[len(edges) - 1]
         else:
             segment4 = translated_segments_cw[i - 1]
-        cw_start = tuple(geometry.get_intersection_point(segment1, segment2))
-        acw_start = tuple(geometry.get_intersection_point(segment3, segment4))
+        cw_start = tuple(get_intersection_point(segment1, segment2))
+        acw_start = tuple(get_intersection_point(segment3, segment4))
         if graph.get_edge_data(edge[0], edge[1])['cw_start'] is None:
             nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_start': cw_start, 'acw_start': acw_start}})
             nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_end': cw_start, 'cw_end': acw_start}})
@@ -114,8 +106,8 @@ def set_remaining_edges_translated_points(graph):
                 continue
             neighbor_edges = get_edges_cw(graph, edge[1])
             if len(neighbor_edges) == 1:
-                cw_end = translate_segment(edge, geometry.lane_width)[1]
-                acw_end = translate_segment(edge, geometry.lane_width, anticlockwise=True)[1]
+                cw_end = translate_segment(edge, road_width)[1]
+                acw_end = translate_segment(edge, road_width, anticlockwise=True)[1]
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'cw_end': cw_end, 'acw_end': acw_end}})
                 nx.set_edge_attributes(graph, {(edge[1], edge[0]): {'acw_start': cw_end, 'cw_start': acw_end}})
                 continue
@@ -192,8 +184,8 @@ def graph_to_lanes(graph):
             edges = get_edges_cw(graph, node)
             for edge in edges:
                 nx.set_edge_attributes(graph, {(edge[0], edge[1]): {'visited': False}})
-                translated_segments_cw.append(translate_segment(edge, geometry.lane_width))
-                translated_segments_acw.append(translate_segment(edge, geometry.lane_width, anticlockwise=True))
+                translated_segments_cw.append(translate_segment(edge, road_width))
+                translated_segments_acw.append(translate_segment(edge, road_width, anticlockwise=True))
 
             set_edges_translated_points(graph, edges, translated_segments_cw, translated_segments_acw)
 
@@ -212,7 +204,7 @@ def plot_segments(segments, color, ax):
         ax.plot(x_values, y_values, color=color, linewidth=0.5)
 
 
-def show_graph_lanes(graph):
+def show_graph_translations(graph):
     base_edges = graph.to_undirected().edges
     translated_vertices, translated_segments, partition_edges = graph_to_lanes(graph)
     fig, ax = plt.subplots()
@@ -236,12 +228,3 @@ def get_translated_vertices_segments(graph):
     return vertices, segments
 
 
-def main():
-    fn = "squares"
-    vertices_fn = f"{fn}_vertices.txt"
-    segments_fn = f"{fn}_segments.txt"
-    graph = files_functions.create_graph_from_files(vertices_fn, segments_fn)
-    show_graph_lanes(graph)
-
-
-# main()

@@ -1,16 +1,10 @@
-# imports
-from math import radians
 import math
-import matplotlib.pyplot as plt
-import Utility.geometry
+from RUSTIC.Utility import geometry
 from math import cos, sin, radians
-from Utility.point import ScaledPoint
+from RUSTIC.Utility.point import ScaledPoint
 from shapely import Point, LineString, Polygon
 from shapely.ops import nearest_points
-from shapely.ops import linemerge
-from shapely.ops import split
-from Utility import geometry
-from ObstacleAvoidance import obstacle_avoidance
+from RUSTIC.ObstacleAvoidance import obstacle_avoidance
 
 # constants
 params = {

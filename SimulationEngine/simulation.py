@@ -1,28 +1,21 @@
-from CarModel import car
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
-from Utility import geometry
+from RUSTIC.Utility import geometry
 from matplotlib.animation import FuncAnimation
 import math
 import winsound
-from matplotlib.patches import Circle
 from shapely import LineString, Point
-from matplotlib.patches import Polygon
-from matplotlib.transforms import Affine2D
-from MapToRoadMapping import dcel
-from matplotlib.image import BboxImage
-import os
-from matplotlib.transforms import Bbox
-from PIL import Image
+from RUSTIC.ObstacleAvoidance.obstacle_avoidance import obstacles
+
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'lightgrey'
 NON_ROAD_COLOR = 'white'
 TRAIL_COLOR = '#807E78'#'grey'
 
-"""For testing this module, please see simulation_main in main.py of Main module"""
+"""For testing this module, please see simulation_main in simulation_main.py of Main module"""
 
 
 def initialize_parameters_dict():
@@ -334,7 +327,7 @@ def calculate_tracking_accuracy(vehicle_trail, track):
     return total_distance
 
 
-def create_simulation_video(vehicles, road_network, obstacles, frames, with_road_network):
+def create_simulation_video(vehicles, road_network, frames, with_road_network):
     parameters_list = compute_parameters(vehicles, road_network, frames)
     plt.close('all')
     # write_parameters_to_file(parameters)
@@ -384,7 +377,7 @@ def plot_vehicle_tracking(vehicle, frames, road_network=None):
     #               f"\nFrames: {frames}"
     # fig.suptitle(f"Tracking metric index: {str(round(tracking_metric_index, 2))}{description}", fontsize=8, x=0, ha='left')
     if road_network:
-        road_network.show_road_network(ax)
+        road_network.extract_roads_from_map_region(ax)
     # file_name = f"{description} tracking.png"
     # fig.savefig(file_name)
 

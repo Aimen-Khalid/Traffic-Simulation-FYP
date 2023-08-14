@@ -1,18 +1,7 @@
-import os
-import sys
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
-sys.path.append(parent_dir)
-
 import math
 from math import cos, sin, radians
 from shapely import LineString, Point
-import numpy as np
-from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
 from .point import ScaledPoint
-lane_width = 20
 
 
 def get_y_at_x(origin, destination, x):
@@ -182,46 +171,6 @@ def rearrange_line_strings(line1, line2):
         line2 = LineString([line2.coords[1], line2.coords[0]])
 
     return line1, line2
-
-
-def get_interpolated_curve(line_string1, line_string2):
-    # Extract x and y coordinates from the first line string
-    line_string1 = LineString(line_string1)
-    line_string2 = LineString(line_string2)
-
-    line_string1, line_string2 = rearrange_line_strings(line_string1, line_string2)
-    x_data1, y_data1 = line_string1.xy
-
-    # Extract x and y coordinates from the second line string
-    x_data2, y_data2 = line_string2.xy
-
-    # Combine the x and y coordinates into a single line string
-    line_string_combined = list(line_string1.coords) + list(line_string2.coords)
-
-    # Extract x and y coordinates from the combined line string
-    x_data_combined, y_data_combined = zip(*line_string_combined)
-    # Cubic spline interpolation
-    y_f = interp1d(x_data_combined, y_data_combined, 'cubic')
-    x = []
-    for i in range(len(x_data_combined) - 1):
-        x_values = np.linspace(x_data_combined[i], x_data_combined[i + 1], 5)[:-1]  # Limit to 4 points
-        x.extend(x_values)
-    y = y_f(x)
-    filtered_x = []
-    filtered_y = []
-    for i in range(len(x)):
-        if not (line_string1.bounds[0] <= x[i] <= line_string1.bounds[2] or line_string2.bounds[0] <= x[i] <= line_string2.bounds[2]):
-            filtered_x.append(x[i])
-            filtered_y.append(y[i])
-    filtered_x.insert(0, line_string1.coords[-1][0])
-    filtered_x.append(line_string2.coords[0][0])
-    filtered_y.insert(0, line_string1.coords[-1][1])
-    filtered_y.append(line_string2.coords[0][1])
-
-    # Create a LineString object from the filtered points
-    filtered_line_string = LineString(zip(filtered_x, filtered_y))
-
-    return list(filtered_line_string.coords)
 
 
 # returns a unit vector perpendicular to the input vector

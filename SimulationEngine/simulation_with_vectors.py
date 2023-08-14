@@ -1,23 +1,22 @@
-from CarModel import car
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
-from Utility import geometry
+from RUSTIC.Utility import geometry
 from matplotlib.animation import FuncAnimation
 import matplotlib
 import math
 import winsound
 from matplotlib.patches import Circle
 from shapely import LineString, Point
-from MapToRoadMapping import dcel
+
 
 ROAD_EDGE_COLOR = 'black'
 ROAD_COLOR = 'lightgrey'
 NON_ROAD_COLOR = 'white'
 TRAIL_COLOR = 'red'
 
-"""For testing this module, please see simulation_main in main.py of Main module"""
+"""For testing this module, please see simulation_main in simulation_main.py of Main module"""
 
 
 def initialize_parameters_dict():
@@ -277,7 +276,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     ax.set_aspect('equal', adjustable='box')
 
     if with_road_network:
-        road_network.show_road_network(ax)
+        road_network.extract_roads_from_map_region(ax)
 
     for obstacle in obstacles:
         x, y = obstacle.exterior.xy
@@ -450,7 +449,7 @@ def plot_vehicle_tracking(vehicles, frames, road_network=None):
     #               f"\nFrames: {frames}"
     # fig.suptitle(f"Tracking metric index: {str(round(tracking_metric_index, 2))}{description}", fontsize=8, x=0, ha='left')
     if road_network:
-        road_network.show_road_network(ax)
+        road_network.extract_roads_from_map_region(ax)
     # file_name = f"{description} tracking.png"
     # fig.savefig(file_name)
 

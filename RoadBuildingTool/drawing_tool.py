@@ -1,15 +1,7 @@
-import os
-import sys
 import matplotlib.pyplot as plt
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
-sys.path.append(parent_dir)
 
-from Utility import files_functions
-
-
-def get_vertices_and_segments():
+def draw_custom_road_network():
     """
         Allows the user to interactively plot a graph by clicking on a grid of points.
 
@@ -91,22 +83,15 @@ def get_vertices_and_segments():
         prev_y = y
 
 
-def draw_and_save_road_network_graph(vertices_file_name, segments_file_name):
-    vertices, segments = get_vertices_and_segments()
-    files_functions.write_vertices_to_file(vertices, vertices_file_name)
-    files_functions.write_segments_to_file(segments, segments_file_name)
-
-
-def get_points_on_graph(road_network, road_network_name):
+def get_points_on_graph(road_network):
     obstacles_positions = []
     # create a figure and axes object
     fig, ax = plt.subplots(figsize=(100, 100))
     # set the aspect ratio of the plot to be equal
     ax.set_aspect('equal')
-
     ax.axis([0, 50, 0, 50])
 
-    road_network.show_road_network(ax, fig)
+    road_network.extract_roads_from_map_region(ax, fig)
     prev_x = 0
     prev_y = 0
     while True:
@@ -115,7 +100,6 @@ def get_points_on_graph(road_network, road_network_name):
         # if there is no point, continue waiting for input
         if len(point) == 0:
             continue
-        # round the point to the nearest grid point
         x = point[0][0]
         y = point[0][1]
         ax.scatter(x, y, s=0.6)
@@ -131,32 +115,3 @@ def get_points_on_graph(road_network, road_network_name):
         prev_y = y
 
 
-def main():
-    graph_name = "graph"
-    vertices_fn = f"{graph_name}_vertices.txt"
-    segments_fn = f"{graph_name}_segments.txt"
-    draw_and_save_road_network_graph(vertices_fn, segments_fn)
-    print(
-        f"Graph's vertices and segments have been written to {segments_fn}and {vertices_fn}respectively."
-    )
-
-
-# main()
-
-
-from flask import Flask, render_template, request
-
-app = Flask(__name__)
-
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    vertices, segments = get_vertices_and_segments()
-
-    return f"Vertices: {vertices}<br>Segments: {segments}"
-    # Process the vertices and segments as needed
-    # For example, you can display the results or save them to a file.
-
-
-if __name__ == '__main__':
-    app.run(debug=True)

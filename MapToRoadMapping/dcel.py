@@ -3,12 +3,11 @@ from matplotlib import patches
 from shapely.geometry import Polygon, Point, LineString
 from random import randint
 import matplotlib.pyplot as plt
-from Utility.geometry import get_intersection_point, lane_width, merge_line_strings
-from .generic_interpolation import path_interpolation
-from .graph_to_road_network import get_translated_vertices_segments, translate_segment
+from RUSTIC.Utility.geometry import get_intersection_point, merge_line_strings
+from RUSTIC.MapToRoadMapping.generic_interpolation import path_interpolation
+from RUSTIC.MapToRoadMapping.graph_to_road_network import get_translated_vertices_segments, translate_segment
 import networkx as nx
-from ObstacleAvoidance import obstacle_avoidance
-import matplotlib
+from RUSTIC.settings import road_width
 CLOCKWISE = 0  # outside edges
 ANTICLOCKWISE = 1  # inside edges
 ROAD = 1
@@ -380,6 +379,7 @@ class Dcel:
         self.outer_face = OuterFace()
 
     def build_dcel(self, graph):
+        print('Creating DCEL...')
         vertices, segments = get_translated_vertices_segments(graph)
         self.__add_points(vertices)
         self.__add_edges_and_twins(segments)
@@ -394,6 +394,7 @@ class Dcel:
         self.__set_faces_curves()
         self.__set_adjacent_faces()
         self.__set_junctions_curves()
+        print('DCEL created.')
 
     def build_dcel_primary(self, points, segments):
         self.__add_points(points)
@@ -425,18 +426,18 @@ class Dcel:
             face.road_separator = get_edge_intersection_points(edge, face.polygon)
 
             face.lane_separators.append(
-                get_edge_intersection_points(translate_segment(edge, 0.5 * lane_width), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.5 * road_width), face.polygon))
             face.lane_separators.append(
-                get_edge_intersection_points(translate_segment(edge, 0.5 * lane_width, True), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.5 * road_width, True), face.polygon))
 
             face.lane_curves.append(
-                get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.75 * road_width), face.polygon))
             face.lane_curves.append(
-                get_edge_intersection_points(translate_segment(edge, 0.25 * lane_width), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.25 * road_width), face.polygon))
             face.lane_curves.append(
-                get_edge_intersection_points(translate_segment(edge, 0.25 * lane_width, True), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.25 * road_width, True), face.polygon))
             face.lane_curves.append(
-                get_edge_intersection_points(translate_segment(edge, 0.75 * lane_width, True), face.polygon))
+                get_edge_intersection_points(translate_segment(edge, 0.75 * road_width, True), face.polygon))
             face.set_curves_direction()
 
             for i in range(len(face.lane_curves)):
@@ -588,6 +589,7 @@ class Dcel:
         #     ax.plot(x, y, color='white', linewidth=0.5)
 
     def show_road_network(self, axis=None, figure=None):
+        print('Plotting DCEL...')
         fig, ax = plt.subplots()
         if axis is not None:
             ax = axis
@@ -598,7 +600,7 @@ class Dcel:
         # matplotlib.use('Agg')
 
         screen_resolution = (1920, 1080)
-        fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=150)
+        # fig = plt.figure(figsize=(screen_resolution[0] / 100, screen_resolution[1] / 100), dpi=150)
 
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         for face in self.faces:
@@ -618,6 +620,7 @@ class Dcel:
         self.plot_edges(ax)
         ax.axis("equal")
         ax.axis("off")
+        print('DCEL plotted.')
         if figure is None:
             plt.show()
 
@@ -900,7 +903,7 @@ class Dcel:
                     connect_curves_sets(first_curve_index=3)
                 face.set_junction_curves_direction()
 
-    def get_track(self, start_node_id, end_node_id, obstacles):
+    def get_track(self, start_node_id, end_node_id):
         def get_lane_curve(target_point, lane_curves_list):
             """Returns that outer-most lane curve from lane_curves_list the origin of which
             is closest to the target point"""
