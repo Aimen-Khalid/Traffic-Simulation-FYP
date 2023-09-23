@@ -10,14 +10,22 @@ static_cars = []
 
 
 def add_obstacles_on_road_network(road_network_name, new=False):
+    """
+    :param road_network_name: name of the road network on which obstacles have to be instantiated
+    :param new: if false, fetches saved obstacles from road_network_name_obstacles_positions.txt.
+    If true, displays the road network and prompts user to draw obstacles. The obstacles will be rectangular. User has
+    to click at two points to draw one obstacle. First point will be starting point of obstacle and second will be
+    ending point of obstacle. When user is instantiating the last obstacle, he has to click on the last point twice to
+    close the road network display. Obstacle positions will be saved in area_name_obstacle_positions.txt file
+    """
     road_network = get_road_network('dha')
     try:
         if new:
             print('Plot points in pairs. Two points of the pair are the two end points of the obstacle.')
             obstacle_positions = get_points_on_graph(road_network)
-            files_functions.write_vertices_to_file(obstacle_positions, f'{road_network_name}_obstacles_positions')
+            files_functions.write_obstacles_to_file(obstacle_positions, road_network_name)
         else:
-            obstacle_positions = files_functions.load_vertices_from_file(f'{road_network_name}_obstacles_positions')
+            obstacle_positions = files_functions.load_obstacles_from_file(road_network_name)
 
         global obstacles
         i = 0
@@ -28,11 +36,14 @@ def add_obstacles_on_road_network(road_network_name, new=False):
             obstacles.append(Polygon([translated_segment_cw[0], translated_segment_cw[1], translated_segment_acw[1],
                                       translated_segment_acw[0]]))
             i += 2
-    except Exception:
-        print('Obstacles not initialized. Creating simulation without obstacles.')
+    except Exception as e:
+        print(f'Obstacles not initialized. Creating simulation without obstacles.\nError: {e}')
 
 
 def find_closest_point_index(point, polygon):
+    """
+    :return: the index of the polygon exterior coordinate array that has the coordinate closest to the given point
+    """
     closest_distance = float('inf')
     closest_index = None
 
@@ -47,6 +58,13 @@ def find_closest_point_index(point, polygon):
 
 
 def get_polygon_halves(intersection_point1, intersection_point2, polygon):  # polygon --> buffer
+    """
+    Splits the polygon in two halves, based on the line made by the two intersection points and returns both the halves
+
+    :param intersection_point1: a tuple representing a point on (or very close) the polygon
+    :param intersection_point2: a tuple representing a point on (or very close) the polygon
+    :param polygon: a shapely polygon that represents the circular deviation around an obstacle
+    """
     exterior_coordinates = list(polygon.exterior.coords)
 
     # Find the closest points on the polygon to the start and end points
@@ -108,15 +126,23 @@ def find_segment_indices(line, point):
 
 
 def modify_reference_track(obstacle, reference_track, road_network):
+    """
+    Modifies the reference track to have a circular deviation around obstacle
+    :param obstacle: a shapely polygon (rectangle) representing the obstacle
+    :param reference_track: reference track (shapely line string) that is to be modified
+    :param road_network: dcel object representing road network that has the reference track
+    :return: the modified reference track
+    """
     centroid = obstacle.centroid
-    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+5)
+    buffer = centroid.buffer(estimate_polygon_radius(obstacle)+5) # circular deviation around obstacle
     intersection_points = reference_track.intersection(buffer)
 
     # Handle case when there are less than two intersection points
     if intersection_points.is_empty:
         return reference_track
 
-    # If intersection points is multiline string, track has already been modified around this obstacle
+    # If intersection points is multiline string, track has already been modified around this obstacle, so return
+    # the track
     if isinstance(intersection_points, MultiLineString):
         return reference_track
     intersection_coordinates = list(intersection_points.coords)
@@ -124,7 +150,8 @@ def modify_reference_track(obstacle, reference_track, road_network):
     intersection_point1 = intersection_coordinates[0]  # start_point
     intersection_point2 = intersection_coordinates[1]  # end_point
 
-    index = find_segment_indices(reference_track, intersection_point1)
+    index = find_segment_indices(reference_track, intersection_point1)  # find the index of the reference track that has
+    # intersection_point1
 
     part1 = list(reference_track.coords)[:index+1]
 

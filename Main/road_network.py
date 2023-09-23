@@ -1,17 +1,17 @@
 import matplotlib.pyplot as plt
-from shapely import Polygon
 import networkx as nx
-import osmnx
 
 from RUSTIC.settings import road_width, scaling_factor
 from RUSTIC.MapToRoadMapping import dcel, osm
 from RUSTIC.Utility.files_functions import \
     (load_vertices_from_file, load_segments_from_file, write_vertices_to_file, write_segments_to_file)
 from RUSTIC.RoadBuildingTool.drawing_tool import draw_custom_road_network
-# from RUSTIC.MapToRoadMapping.graph_to_road_network import show_graph_translations
 
 
 def get_road_network_graph(area_name):
+    """
+    :returns: underlying graph of the saved road network represented by area_name
+    """
     graph = nx.DiGraph()
     vertices = list(set(load_vertices_from_file(area_name)))
     segments = load_segments_from_file(area_name)
@@ -24,31 +24,6 @@ def get_road_network_graph(area_name):
         graph.add_edge(segment[1], segment[0], visited=False, cw_start=None, cw_end=None, acw_start=None, acw_end=None,
                        lane_width=road_width)
     return graph
-
-
-def extract_roads_from_osm(coordinates):
-    tags = {
-        "highway": ["primary", "secondary", "tertiary", "residential", "living_street", "service", "roads"]
-    }
-    geom = Polygon(coordinates)
-    gdf = osmnx.geometries_from_polygon(geom, tags=tags)
-    if len(gdf) == 0:
-        raise ValueError("Selected region has no roads")
-    # Converting coordinates from lat/long to meters
-    gdf = osmnx.projection.project_gdf(gdf, to_crs='EPSG:3857', to_latlong=False)
-    gdf = gdf[['geometry']]
-    segments = []
-    vertices = []
-    for index, row in gdf.iterrows():
-        coordinates = row['geometry'].coords
-        for i, coord in enumerate(coordinates[:-1]):
-            coordinate_1 = (scaling_factor*coordinates[i][0], scaling_factor*coordinates[i][1])
-            coordinate_2 = (scaling_factor*coordinates[i + 1][0], scaling_factor*coordinates[i + 1][1])
-            segment = [coordinate_1, coordinate_2]
-            vertices.extend((coordinate_1, coordinate_2))
-            segments.append(segment)
-
-    return vertices, segments
 
 
 def show_graph(graph, with_labels=False, label_with_coordinates=True):
@@ -68,12 +43,23 @@ def show_graph(graph, with_labels=False, label_with_coordinates=True):
 
 
 def get_road_network(area_name, new_custom=False, new_from_map=False):
+    """
+    Returns a dcel containing a road network of roads in area_name
+    :param area_name: name of the area whose road network is to be fetched
+    :param new_custom: if true, prompts user to create new road network's graph and saves it in area_name_vertices.txt,
+    area_name_segments.txt, area_name_obstacles_positions.txt
+    :param new_from_map: if true, prompts user to select a geojson file from file explorer, extracts the coordinates of
+    bounding box of map from it, creates a road network of the area inside the bounding box and saves it in
+    area_name_vertices.txt, area_name_segments.txt, area_name_obstacles_positions.txt.
+    If both bool params are false, the function expects that a saved road network exists in files with prefix area_name
+    and fetches the network from these files and returns it.
+    """
     if new_from_map:
         print('Run the map.html file. Select the region from map and click export.\n'
               'A geojson file will be saved. When this function is run, select the geojson file from the\n'
               'explorer that appeared. This will extract roads from that region and display the corresponding DCEL.')
         coordinates = osm.select_map_region()
-        vertices, segments = extract_roads_from_osm(coordinates)
+        vertices, segments = osm.extract_roads_from_osm(coordinates)
         write_vertices_to_file(vertices, area_name)
         write_segments_to_file(segments, area_name)
     elif new_custom:
@@ -90,8 +76,8 @@ def get_road_network(area_name, new_custom=False, new_from_map=False):
 
 
 def main():
-    road_network = get_road_network("test", new_from_map=False, new_custom=False)
+    road_network = get_road_network("dha", new_from_map=False, new_custom=False)
     road_network.show_road_network()
 
 
-# main()
+main()

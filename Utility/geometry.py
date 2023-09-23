@@ -206,3 +206,16 @@ def merge_line_strings(l1, l2):
     coords.extend(list(l2.coords))
     return LineString(coords)
 
+
+def get_edge_intersection_points(edge, polygon):
+    exterior = polygon.exterior
+    points = list(exterior.coords)
+    polygon_edges = [(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    polygon_edges.append((points[-1], points[0]))
+    min_x, min_y, max_x, max_y = polygon.bounds
+    intersection_points = []
+    for e in polygon_edges:
+        point = get_intersection_point(e, edge)
+        if point != [None] and min_x <= point[0] <= max_x and min_y <= point[1] <= max_y:
+            intersection_points.append(point)
+    return intersection_points

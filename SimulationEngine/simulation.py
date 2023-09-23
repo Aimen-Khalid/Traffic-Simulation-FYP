@@ -220,7 +220,7 @@ def get_artist_objects(ax, no_of_vehicles):
     return vehicle_lines#, trail_lines
 
 
-def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network):  # reference track
+def simulate(road_network, vehicles, frames, parameters_list, file_name, with_road_network):  # reference track
     matplotlib.use('Agg')
 
     screen_resolution = (1920, 1080)
@@ -274,6 +274,9 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
             window_size = 120
             ax.set_xlim(center_x - window_size, center_x + window_size)
             ax.set_ylim(center_y - window_size, center_y + window_size)
+
+            #  uncomment the next two lines to have a zoomed in simulation. Adjust window_size variable.
+
             # ax.set_xlim(parameters['centroid'][i].x - window_size, parameters['centroid'][i].x + window_size)
             # ax.set_ylim(parameters['centroid'][i].y - window_size, parameters['centroid'][i].y + window_size)
 
@@ -287,7 +290,7 @@ def simulate(road_network, vehicles, obstacles, frames, parameters_list, file_na
     print("Animation in progress...")
     start = time.time()
     anim = FuncAnimation(fig, animate, frames=frames, blit=True)
-    anim.save(file_name, writer='ffmpeg', fps=240)#180)
+    anim.save(file_name, writer='ffmpeg', fps=240)  # speed of simulation increases with increasing fps
     end = time.time()
     print("Animation COMPLETED....")
     print(f"{int(end - start)} Seconds")
@@ -340,8 +343,8 @@ def create_simulation_video(vehicles, road_network, frames, with_road_network):
     #             f"lookahead_time {vehicle.turning_lookahead.time}" \
     #             f".mp4"
     file_name = "anothervideotest.mp4"
-    simulate(road_network, vehicles, obstacles, frames, parameters_list, file_name, with_road_network)
-    winsound.Beep(frequency=2500, duration=1000)
+    simulate(road_network, vehicles, frames, parameters_list, file_name, with_road_network)
+    winsound.Beep(frequency=2500, duration=1000) #  a beep sound to indicate simulation video is completed
     # plot_parameters(vehicle, fig_name=file_name)
 
 

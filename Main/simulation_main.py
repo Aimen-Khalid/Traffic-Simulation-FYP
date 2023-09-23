@@ -22,6 +22,11 @@ def get_velocity_for_vector(reference_track, magnitude):
 
 
 def create_track(file_name, new):
+    """
+    :param file_name: name of file that has points that make up reference track
+    :param new: if true, prompts user to create new track and saves points in file_name.
+    if false, fetches saved points from file_name to create a track (a line string)
+    """
     if new:
         print("Draw a track for your car to follow...")
         track, _ = draw_custom_road_network()
@@ -53,6 +58,11 @@ def simulate_on_track(frames, track_name, if_new_track):
 
 
 def is_close_to_existing(existing_points, new_point, distance_threshold):
+    """
+    :param existing_points: a list of shapely points
+    :param new_point: a shapely point object
+    :return: a boolean indicating if new_point lies within distance_threshold of any of the existing_points
+    """
     for point in existing_points:
         distance = point.distance(new_point)
         if distance < distance_threshold:
@@ -61,6 +71,11 @@ def is_close_to_existing(existing_points, new_point, distance_threshold):
 
 
 def get_random_track(road_network):
+    """
+    :param road_network: a dcel object containing road network
+    :return: a track that has a random node of road network graph as starting point and another random node as ending
+    point
+    """
     no_of_nodes = road_network.graph.number_of_nodes() - 1
     start_node_id = random.randint(0, no_of_nodes)
     end_node_id = random.randint(0, no_of_nodes)
@@ -70,6 +85,9 @@ def get_random_track(road_network):
 
 
 def cut_last_segment_at_random(line_string):
+    """
+    :returns: cuts the last segment of the given line string at a random point and returns the modified line string
+    """
     if not line_string.is_empty and line_string.is_ring:
         raise ValueError("Input LineString must not be empty and must not be a ring.")
     last_segment = line_string.coords[-2:]
@@ -81,6 +99,9 @@ def cut_last_segment_at_random(line_string):
 
 
 def init_car_params(road_network):
+    """
+    :returns: returns some randomly initialized car parameters for a single car based on given road network
+    """
     reference_track = get_random_track(road_network)
     segment = LineString([reference_track.coords[0], reference_track.coords[1]])
     interpolation_distance = random.uniform(0.1, 0.7)
@@ -94,11 +115,16 @@ def init_car_params(road_network):
 
 
 def get_vehicles_list(no_of_vehicles, road_network):
+    """
+    :returns: a list having no_of_vehicles instances of vehicle objects that have randomly initialized parameters based
+    on road_network
+    """
     print(f'{no_of_vehicles} vehicles being initialized...')
     vehicles_list = []
     initial_positions = []
     final_positions = []
     with tqdm(total=no_of_vehicles) as pbar:
+        safe_distance = 6
         for vehicle_count in range(no_of_vehicles):
             if vehicle_count % 2 == 0:  # honda civic
                 length = 4.6
@@ -108,14 +134,15 @@ def get_vehicles_list(no_of_vehicles, road_network):
                 width = 1.5
 
             reference_track, initial_position, final_position, init_velocity = init_car_params(road_network)
-            safe_distance = 6
             iterations = 0
             while is_close_to_existing(initial_positions, initial_position, safe_distance) \
                     or is_close_to_existing(final_positions, final_position, safe_distance):
                 reference_track, initial_position, final_position, init_velocity = init_car_params(road_network)
                 iterations += 1
                 if iterations >= 200:
-                    raise ValueError(f'No more space for more cars. Retry by reducing safe_distance.')
+                    raise ValueError(
+                        'No more space for more cars. Retry by reducing safe_distance.'
+                    )
             initial_positions.append(initial_position)
             final_positions.append(final_position)
 
@@ -133,7 +160,7 @@ def get_vehicles_list(no_of_vehicles, road_network):
 
 
 def main():
-    frames = 1
+    frames = 2000
     area_name = 'dha'
     road_network = get_road_network(area_name)
     obstacle_avoidance.add_obstacles_on_road_network(area_name, new=False)
